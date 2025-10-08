@@ -5,65 +5,55 @@ use Illuminate\Http\Request;
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ContactController;
-use App\Http\Controllers\TagController;
-use App\Http\Controllers\ContactTagController;
-use App\Http\Controllers\ReminderController;
 
 /**
  * AUTH (public)
  */
 Route::prefix('auth')->group(function () {
-  Route::post('register', [AuthController::class,'register']);
-  Route::post('login',    [AuthController::class,'login']);
+    Route::post('register', [AuthController::class,'register']);
+    Route::post('login',    [AuthController::class,'login']);
+    Route::post('magic/exchange', [AuthController::class,'magicExchange']);
 
-  // Magic login: đổi code -> token (chỉ dùng nếu verify + login bằng ?login=1)
-  Route::post('magic/exchange', [AuthController::class,'magicExchange']);
-
-  Route::post('password/request', [AuthController::class, 'passwordRequest']);
-  Route::post('password/resend',  [AuthController::class, 'passwordResend']);
-  Route::post('password/verify',  [AuthController::class, 'passwordVerify']);
+    Route::post('password/request', [AuthController::class, 'passwordRequest']);
+    Route::post('password/resend',  [AuthController::class, 'passwordResend']);
+    Route::post('password/verify',  [AuthController::class, 'passwordVerify']);
 });
 
-/**
- * EMAIL VERIFICATION
- * - Stateless: chỉ cần chữ ký 'signed', không yêu cầu đang đăng nhập.
- * - Có thể thêm ?login=1 để verify + tạo magic code (FE đổi code lấy token).
- */
 Route::get('email/verify/{id}/{hash}', [AuthController::class,'verifyEmail'])
-  ->middleware(['signed'])
-  ->name('verification.verify');
+    ->middleware(['signed'])
+    ->name('verification.verify');
 
+Route::middleware('auth:sanctum')->get('email/verified', fn (Request $r) => [
+    'verified' => (bool) $r->user()->hasVerifiedEmail(),
+]);
 
-// Kiểm tra đã verify chưa (cần đăng nhập)
-Route::middleware('auth:sanctum')->get('email/verified', function (Request $r) {
-  return ['verified' => (bool) $r->user()->hasVerifiedEmail()];
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('auth/me',      [AuthController::class,'me']);
+    Route::post('auth/logout', [AuthController::class,'logout']);
 });
-
-// Gửi lại email verify (cần đăng nhập, throttle)
-Route::middleware(['auth:sanctum','throttle:6,1'])
-  ->post('email/verification-notification', [AuthController::class, 'resendVerification']);
 
 /**
  * API CHÍNH — yêu cầu ĐĂNG NHẬP + ĐÃ VERIFY
  */
 Route::middleware(['auth:sanctum','verified'])->group(function () {
-  // Contacts CRUD
-  Route::apiResource('contacts', ContactController::class);
+    // Export/Import đặt TRƯỚC các route {contact}
+    Route::match(['GET','POST'], '/contacts/export', [ContactController::class, 'export']);
+    Route::post('/contacts/import', [ContactController::class, 'import']);
+    // Nếu muốn public template thì đưa ra ngoài group; nếu muốn bảo vệ thì để ở đây.
+    Route::get('/contacts/export-template', [ContactController::class, 'exportTemplate']);
 
-  // Tags + attach/detach
-  Route::apiResource('tags', TagController::class)->only(['index','store','update','destroy']);
-  Route::post('contacts/{contact}/tags', [ContactTagController::class,'attach']);
-  Route::delete('contacts/{contact}/tags/{tag}', [ContactTagController::class,'detach']);
+    // CRUD
+    Route::get('/contacts', [ContactController::class, 'index']);
+    Route::post('/contacts', [ContactController::class, 'store']);
 
-  // Reminders
-  Route::apiResource('reminders', ReminderController::class)->only(['index','store','update','destroy']);
-  Route::post('reminders/{reminder}/done', [ReminderController::class,'markDone']);
+    Route::get('/contacts/{contact}', [ContactController::class, 'show'])->whereNumber('contact');
+    Route::put('/contacts/{contact}', [ContactController::class, 'update'])->whereNumber('contact');
+    Route::delete('/contacts/{contact}', [ContactController::class, 'destroy'])->whereNumber('contact');
+
+    Route::post('/contacts/{contact}/tags', [ContactController::class, 'attachTags'])->whereNumber('contact');
+    Route::delete('/contacts/{contact}/tags/{tag}', [ContactController::class, 'detachTag'])
+        ->whereNumber('contact')->whereNumber('tag');
 });
 
-/**
- * Tuỳ chọn: cho phép lấy profile / logout không cần verified
- */
-Route::middleware('auth:sanctum')->group(function () {
-  Route::get('auth/me',      [AuthController::class,'me']);
-  Route::post('auth/logout', [AuthController::class,'logout']);
-});
+// 👉 BỎ dòng dưới (đang bị trùng) nếu bạn để template trong group ở trên.
+// Route::get('contacts/export-template', [ContactController::class, 'exportTemplate']);

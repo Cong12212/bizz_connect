@@ -6,6 +6,10 @@ use App\Models\Contact;
 use App\Models\Tag;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\ContactsExport;
+use App\Exports\ContactsTemplateExport;
+use App\Imports\ContactsImport;
 
 class ContactController extends Controller
 {
@@ -265,4 +269,130 @@ class ContactController extends Controller
         $str = preg_replace('/#([\\pL\\pN_\\-]+)/u', ' ', $q);
         return trim(preg_replace('/\\s+/', ' ', (string) $str));
     }
+
+    // GET /contacts/export?format=xlsx|csv + (q, tags, tag_ids, tag_mode, sort, per_page...) như index()
+// Trả về file Excel/CSV theo filter hiện tại
+public function export(Request $r)
+    {
+        $query = Contact::query()
+            ->where('owner_user_id', $r->user()->id)
+            ->with('tags');
+
+        // --- ids (tùy chọn) ---
+        $ids = $r->input('ids', []);
+        if (is_string($ids)) {
+            $ids = array_filter(array_map('intval', explode(',', $ids)));
+        }
+        if (is_array($ids) && !empty($ids)) {
+            $query->whereIn('id', $ids);
+        }
+
+        // --- các filter còn lại (q + hashtag trong q, tag_ids, tags, tag_mode, sort) y hệt index() ---
+        $rawQ         = trim((string) $r->query('q', ''));
+        $hashTagNames = $this->extractHashtags($rawQ);
+        $textTerm     = $this->stripHashtags($rawQ);
+
+        if ($textTerm !== '') {
+            $term = "%{$textTerm}%";
+            $query->where(function ($w) use ($term) {
+                $w->where('name', 'like', $term)
+                  ->orWhere('email', 'like', $term)
+                  ->orWhere('phone', 'like', $term)
+                  ->orWhere('company', 'like', $term);
+            });
+        }
+
+        $tagIds = [];
+        if ($p = $r->query('tag_ids')) {
+            $tagIds = is_array($p) ? $p : explode(',', (string)$p);
+            $tagIds = array_values(array_filter(array_map('intval', $tagIds)));
+        }
+
+        $tagNames = [];
+        if ($p = $r->query('tags')) {
+            $tagNames = is_array($p) ? $p : explode(',', (string)$p);
+            $tagNames = array_values(array_filter(array_map(fn($s)=>ltrim(trim($s),'#'), $tagNames)));
+        }
+
+        if (!empty($hashTagNames)) {
+            $tagNames = array_values(array_unique(array_merge($tagNames, $hashTagNames)));
+        }
+
+        if (!empty($tagIds) || !empty($tagNames)) {
+            $mode = $r->query('tag_mode', 'any');
+            if (!empty($tagIds)) {
+                if ($mode === 'all') {
+                    foreach ($tagIds as $id) {
+                        $query->whereHas('tags', fn($t) => $t->where('tags.id', $id));
+                    }
+                } else {
+                    $query->whereHas('tags', fn($t) => $t->whereIn('tags.id', $tagIds));
+                }
+            }
+            if (!empty($tagNames)) {
+                if ($mode === 'all') {
+                    foreach ($tagNames as $name) {
+                        $query->whereHas('tags', fn($t) => $t->where('tags.name', $name));
+                    }
+                } else {
+                    $query->whereHas('tags', fn($t) => $t->whereIn('tags.name', $tagNames));
+                }
+            }
+        }
+
+        $sort = (string)$r->query('sort', '-id');
+        $sort === 'name'   ? $query->orderBy('name')
+      : ($sort === '-name' ? $query->orderBy('name', 'desc')
+      : ($sort === 'id'    ? $query->orderBy('id')
+                           : $query->orderBy('id', 'desc')));
+
+        $contacts = $query->get();
+
+        $export  = new ContactsExport($contacts);
+        $format  = strtolower((string)$r->query('format', 'xlsx'));
+        $file    = 'contacts_'.now()->format('Ymd_His').'.'.$format;
+
+        return $format === 'csv'
+            ? Excel::download($export, $file, \Maatwebsite\Excel\Excel::CSV)
+            : Excel::download($export, $file, \Maatwebsite\Excel\Excel::XLSX);
+    }
+
+    /**
+     * GET /contacts/export-template
+     * Trả về file mẫu chỉ có header, không có data
+     * ?format=xlsx|csv (mặc định xlsx)
+     */
+    public function exportTemplate(Request $r)
+    {
+        $export = new ContactsTemplateExport();
+        $format = strtolower((string)$r->query('format', 'xlsx'));
+
+        return $format === 'csv'
+            ? Excel::download($export, 'contacts_template.csv', \Maatwebsite\Excel\Excel::CSV)
+            : Excel::download($export, 'contacts_template.xlsx', \Maatwebsite\Excel\Excel::XLSX);
+    }
+
+
+// POST /contacts/import  (multipart/form-data: file, match_by=id|email|phone)
+// Trả về thống kê created/updated/skipped + errors
+public function import(Request $r)
+{
+    // import()
+$data = $r->validate([
+    'file'     => 'required|file|mimes:xlsx,csv', // bỏ txt cho chặt
+    'match_by' => 'nullable|in:id,email,phone',
+]);
+
+$matchBy = $data['match_by'] ?? 'id';
+
+$import = new ContactsImport($r->user()->id, $matchBy); // dùng class đã use
+Excel::import($import, $data['file']);
+
+return response()->json([
+    'status'  => 'ok',
+    'summary' => $import->result(),
+]);
+
+}
+
 }
