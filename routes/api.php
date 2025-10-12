@@ -5,6 +5,10 @@ use Illuminate\Http\Request;
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\TagController;             
+use App\Http\Controllers\ContactTagController;
+use App\Http\Controllers\ReminderController;   
+use App\Http\Controllers\NotificationController;
 
 /**
  * AUTH (public)
@@ -30,6 +34,8 @@ Route::middleware('auth:sanctum')->get('email/verified', fn (Request $r) => [
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('auth/me',      [AuthController::class,'me']);
     Route::post('auth/logout', [AuthController::class,'logout']);
+    Route::patch('auth/me', [AuthController::class,'updateMe']);
+
 });
 
 /**
@@ -53,7 +59,26 @@ Route::middleware(['auth:sanctum','verified'])->group(function () {
     Route::post('/contacts/{contact}/tags', [ContactController::class, 'attachTags'])->whereNumber('contact');
     Route::delete('/contacts/{contact}/tags/{tag}', [ContactController::class, 'detachTag'])
         ->whereNumber('contact')->whereNumber('tag');
+
+    Route::get('/tags', [TagController::class, 'index']);
+    Route::post('/tags', [TagController::class, 'store']);
+    Route::put('/tags/{tag}', [TagController::class, 'update'])->whereNumber('tag');
+    Route::delete('/tags/{tag}', [TagController::class, 'destroy'])->whereNumber('tag');
+
+   Route::get('/reminders', [ReminderController::class, 'index']);
+    Route::post('/reminders', [ReminderController::class, 'store']);
+    Route::get('/reminders/{reminder}', [ReminderController::class, 'show'])->whereNumber('reminder');
+    Route::patch('/reminders/{reminder}', [ReminderController::class, 'update'])->whereNumber('reminder');
+    Route::delete('/reminders/{reminder}', [ReminderController::class, 'destroy'])->whereNumber('reminder');
+    Route::post('/reminders/bulk-status', [ReminderController::class, 'bulkStatus']);
+    Route::post('/reminders/bulk-delete', [ReminderController::class, 'bulkDelete']);
+    Route::get('/reminders/pivot', [ReminderController::class, 'pivotIndex']);
+
+    Route::get   ('/notifications', [NotificationController::class, 'index']);
+Route::post  ('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->whereNumber('notification');
+Route::post  ('/notifications/{notification}/done', [NotificationController::class, 'markDone'])->whereNumber('notification');
+Route::post  ('/notifications/bulk-read', [NotificationController::class, 'bulkRead']);
+Route::delete('/notifications/{notification}', [NotificationController::class, 'destroy'])->whereNumber('notification');
+
 });
 
-// 👉 BỎ dòng dưới (đang bị trùng) nếu bạn để template trong group ở trên.
-// Route::get('contacts/export-template', [ContactController::class, 'exportTemplate']);

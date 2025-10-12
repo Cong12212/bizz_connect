@@ -19,6 +19,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'verified' => EnsureEmailIsVerified::class,
         ]);
+
+        $middleware->alias([
+            'plus' => \App\Http\Middleware\EnsurePlus::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
 

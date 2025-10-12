@@ -207,4 +207,16 @@ public function passwordVerify(Request $r)
 
     return response()->json(['message' => 'Password has been reset. Please log in with your new password.'], 200);
 }
+
+public function updateMe(Request $r) {
+  $u = $r->user();
+  $data = $r->validate([
+    'name' => 'sometimes|string|max:100',
+    'email'=> 'sometimes|email|unique:users,email,'.$u->id,
+    'password' => 'sometimes|string|min:6',
+  ]);
+  if (isset($data['password'])) $data['password'] = \Hash::make($data['password']);
+  $u->fill($data)->save();
+  return $u;
+}
 }

@@ -2,29 +2,34 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
-  public function up(): void {
-    Schema::create('subscriptions', function (Blueprint $t) {
-      $t->id();
-      // một trong hai: gắn cho công ty hoặc cá nhân pro
-      $t->foreignId('company_id')->nullable()->constrained('companies')->cascadeOnDelete();
-      $t->foreignId('user_id')->nullable()->constrained('users')->cascadeOnDelete();
+    public function up(): void {
+        Schema::table('subscriptions', function (Blueprint $t) {
+            $t->index(['plan', 'status']);
+            $t->index(['current_period_end']);
+            $t->unique(['company_id','user_id','plan','status'], 'uniq_owner_plan_status');
+        });
 
-      $t->string('plan');    // free|pro|pro_plus
-      $t->string('status')->default('active'); // active|past_due|canceled
-      $t->timestamp('current_period_start')->nullable();
-      $t->timestamp('current_period_end')->nullable();
+        // Enforce exactly-one owner (company XOR user)
+        DB::statement(<<<SQL
+            ALTER TABLE subscriptions
+            ADD CONSTRAINT chk_one_owner
+            CHECK (
+                (company_id IS NOT NULL AND user_id IS NULL)
+                OR (company_id IS NULL AND user_id IS NOT NULL)
+            )
+        SQL);
+    }
 
-      $t->string('payment_provider')->nullable();      // stripe|paypal|...
-      $t->string('provider_customer_id')->nullable();
-      $t->string('provider_subscription_id')->nullable();
-
-      $t->timestamps();
-
-      $t->index(['company_id','user_id','status']);
-    });
-  }
-  public function down(): void { Schema::dropIfExists('subscriptions'); }
+    public function down(): void {
+        try { DB::statement('ALTER TABLE subscriptions DROP CONSTRAINT chk_one_owner'); } catch (\Throwable $e) {}
+        Schema::table('subscriptions', function (Blueprint $t) {
+            $t->dropUnique('uniq_owner_plan_status');
+            $t->dropIndex(['plan','status']);
+            $t->dropIndex(['current_period_end']);
+        });
+    }
 };

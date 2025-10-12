@@ -10,6 +10,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\ContactsExport;
 use App\Exports\ContactsTemplateExport;
 use App\Imports\ContactsImport;
+use App\Models\UserNotification;
 
 class ContactController extends Controller
 {
@@ -20,6 +21,7 @@ class ContactController extends Controller
      * - tag_ids: "1,2,3" hoặc [1,2,3]
      * - tags: "vip,design" hoặc "#vip,#design"
      * - tag_mode: any|all (mặc định any)
+     * - without_tag: id hoặc name (loại trừ những contact đang có tag này)
      * - sort: name|-name|id|-id (mặc định -id)
      * - per_page: tối đa 100
      */
@@ -27,20 +29,21 @@ class ContactController extends Controller
     {
         $per = min(100, (int) $r->query('per_page', 20));
 
-        $q = Contact::query()->where('owner_user_id', $r->user()->id);
+        $q = Contact::query()
+            ->where('owner_user_id', $r->user()->id);
 
         // --- Parse q: tách hashtag ra khỏi phần text ---
-        $rawQ = trim((string) $r->query('q', ''));
+        $rawQ         = trim((string) $r->query('q', ''));
         $hashTagNames = $this->extractHashtags($rawQ); // ['vip','design', ...]
-        $textTerm = $this->stripHashtags($rawQ);       // phần q không có #tag
+        $textTerm     = $this->stripHashtags($rawQ);   // phần q không có #tag
 
         if ($textTerm !== '') {
             $term = "%{$textTerm}%";
             $q->where(function ($w) use ($term) {
                 $w->where('name', 'like', $term)
-                  ->orWhere('email', 'like', $term)
-                  ->orWhere('phone', 'like', $term)
-                  ->orWhere('company', 'like', $term);
+                    ->orWhere('email', 'like', $term)
+                    ->orWhere('phone', 'like', $term)
+                    ->orWhere('company', 'like', $term);
             });
         }
 
@@ -92,6 +95,18 @@ class ContactController extends Controller
             }
         }
 
+        // --- WITHOUT TAG (id hoặc name) ---
+        if ($r->filled('without_tag')) {
+            $val = $r->query('without_tag');
+            $q->whereDoesntHave('tags', function ($t) use ($val, $r) {
+                if (is_numeric($val)) {
+                    $t->where('tags.id', (int) $val);
+                } else {
+                    $t->where('tags.name', ltrim((string) $val, '#'));
+                }
+            });
+        }
+
         // --- Sort ---
         $sort = (string) $r->query('sort', '-id');
         $sort === 'name'   ? $q->orderBy('name')
@@ -133,6 +148,14 @@ class ContactController extends Controller
         }
 
         $c = Contact::create($data);
+
+         UserNotification::log($r->user()->id, [
+        'type'        => 'contact.created',
+        'title'       => 'New contact created',
+        'body'        => $c->name . ($c->company ? ' · '.$c->company : ''),
+        'data'        => ['contact_id' => $c->id],
+        'contact_id'  => $c->id,
+    ]);
         return response()->json(['data' => $c->load('tags')], 201);
     }
 
@@ -147,9 +170,6 @@ class ContactController extends Controller
 
     /**
      * PUT /contacts/{contact}
-     * Tất cả field đều "sometimes|..." để hỗ trợ partial update.
-     * Chặn duplicate_of_id tự tham chiếu và chỉ cho phép trỏ tới contact cùng owner.
-     * (kèm chặn vòng A↔B đơn giản)
      */
     public function update(Request $r, Contact $contact)
     {
@@ -171,13 +191,13 @@ class ContactController extends Controller
                 Rule::exists('contacts','id')->where(fn($q) =>
                     $q->where('owner_user_id', $r->user()->id)
                 ),
-                Rule::notIn([$contact->id]), // không được trỏ tới chính nó
+                Rule::notIn([$contact->id]),
             ],
             'search_text'     => 'sometimes|nullable|string',
             'source'          => 'sometimes|nullable|string|max:50',
         ]);
 
-        // Chặn vòng A↔B đơn giản (tuỳ chọn)
+        // Chặn vòng A↔B đơn giản
         if (!empty($payload['duplicate_of_id'])) {
             $target = Contact::select('id','duplicate_of_id')
                 ->where('owner_user_id', $r->user()->id)
@@ -223,7 +243,12 @@ class ContactController extends Controller
             foreach ($body['names'] as $name) {
                 $name = ltrim(trim($name), '#');
                 if ($name === '') continue;
-                $tag = Tag::firstOrCreate(['name' => $name]);
+
+                // tạo tag theo phạm vi user hiện tại
+                $tag = Tag::firstOrCreate([
+                    'owner_user_id' => $r->user()->id,
+                    'name'          => $name,
+                ]);
                 $ids[] = $tag->id;
             }
         }
@@ -256,7 +281,7 @@ class ContactController extends Controller
     private function extractHashtags(string $q): array
     {
         if ($q === '') return [];
-        preg_match_all('/#([\\pL\\pN_\\-]+)/u', $q, $m);
+        preg_match_all('/#([\pL\pN_\-]+)/u', $q, $m);
         $names = $m[1] ?? [];
         $names = array_map(fn($s) => mb_strtolower($s), $names);
         return array_values(array_unique(array_filter($names, fn($s) => $s !== '')));
@@ -266,13 +291,15 @@ class ContactController extends Controller
     private function stripHashtags(string $q): string
     {
         if ($q === '') return '';
-        $str = preg_replace('/#([\\pL\\pN_\\-]+)/u', ' ', $q);
-        return trim(preg_replace('/\\s+/', ' ', (string) $str));
+        $str = preg_replace('/#([\pL\pN_\-]+)/u', ' ', $q);
+        return trim(preg_replace('/\s+/', ' ', (string) $str));
     }
 
-    // GET /contacts/export?format=xlsx|csv + (q, tags, tag_ids, tag_mode, sort, per_page...) như index()
-// Trả về file Excel/CSV theo filter hiện tại
-public function export(Request $r)
+    /**
+     * GET /contacts/export?format=xlsx|csv + (q, tags, tag_ids, tag_mode, sort, per_page...) như index()
+     * Trả về file Excel/CSV theo filter hiện tại
+     */
+    public function export(Request $r)
     {
         $query = Contact::query()
             ->where('owner_user_id', $r->user()->id)
@@ -296,9 +323,9 @@ public function export(Request $r)
             $term = "%{$textTerm}%";
             $query->where(function ($w) use ($term) {
                 $w->where('name', 'like', $term)
-                  ->orWhere('email', 'like', $term)
-                  ->orWhere('phone', 'like', $term)
-                  ->orWhere('company', 'like', $term);
+                    ->orWhere('email', 'like', $term)
+                    ->orWhere('phone', 'like', $term)
+                    ->orWhere('company', 'like', $term);
             });
         }
 
@@ -340,6 +367,18 @@ public function export(Request $r)
             }
         }
 
+        // --- WITHOUT TAG (id hoặc name) cho export ---
+        if ($r->filled('without_tag')) {
+            $val = $r->query('without_tag');
+            $query->whereDoesntHave('tags', function ($t) use ($val) {
+                if (is_numeric($val)) {
+                    $t->where('tags.id', (int) $val);
+                } else {
+                    $t->where('tags.name', ltrim((string)$val, '#'));
+                }
+            });
+        }
+
         $sort = (string)$r->query('sort', '-id');
         $sort === 'name'   ? $query->orderBy('name')
       : ($sort === '-name' ? $query->orderBy('name', 'desc')
@@ -359,8 +398,6 @@ public function export(Request $r)
 
     /**
      * GET /contacts/export-template
-     * Trả về file mẫu chỉ có header, không có data
-     * ?format=xlsx|csv (mặc định xlsx)
      */
     public function exportTemplate(Request $r)
     {
@@ -372,27 +409,127 @@ public function export(Request $r)
             : Excel::download($export, 'contacts_template.xlsx', \Maatwebsite\Excel\Excel::XLSX);
     }
 
+    /**
+     * POST /contacts/import (multipart/form-data: file, match_by=id|email|phone)
+     * Trả về thống kê created/updated/skipped + errors
+     */
+    public function import(Request $r)
+    {
+        $data = $r->validate([
+            'file'     => 'required|file|mimes:xlsx,csv',
+            'match_by' => 'nullable|in:id,email,phone',
+        ]);
 
-// POST /contacts/import  (multipart/form-data: file, match_by=id|email|phone)
-// Trả về thống kê created/updated/skipped + errors
-public function import(Request $r)
-{
-    // import()
-$data = $r->validate([
-    'file'     => 'required|file|mimes:xlsx,csv', // bỏ txt cho chặt
-    'match_by' => 'nullable|in:id,email,phone',
-]);
+        $matchBy = $data['match_by'] ?? 'id';
 
-$matchBy = $data['match_by'] ?? 'id';
+        $import = new ContactsImport($r->user()->id, $matchBy);
+        Excel::import($import, $data['file']);
 
-$import = new ContactsImport($r->user()->id, $matchBy); // dùng class đã use
-Excel::import($import, $data['file']);
+        return response()->json([
+            'status'  => 'ok',
+            'summary' => $import->result(),
+        ]);
+    }
 
-return response()->json([
-    'status'  => 'ok',
-    'summary' => $import->result(),
-]);
+    public function bulkUpsert(Request $r)
+    {
+        $uid = $r->user()->id;
+        $payload = $r->validate([
+            'items' => ['required','array','min:1'],
+            'match' => ['nullable', Rule::in(['id','email','phone','name_company'])],
+        ]);
+        $match = $payload['match'] ?? 'id';
 
-}
+        $created = 0; $updated = 0; $remCreated = 0; $remUpdated = 0; $results = [];
 
+        DB::transaction(function () use ($uid, $payload, $match, &$created, &$updated, &$remCreated, &$remUpdated, &$results) {
+            foreach ($payload['items'] as $row) {
+                // Validate contact row
+                $data = validator($row, [
+                    'id'          => ['sometimes','integer'],
+                    'name'        => ['required','string','max:255'],
+                    'email'       => ['nullable','email','max:255'],
+                    'phone'       => ['nullable','string','max:64'],
+                    'company'     => ['nullable','string','max:255'],
+                    'address'     => ['nullable','string'],
+                    'notes'       => ['nullable','string'],
+                    'job_title'   => ['nullable','string','max:255'],
+                    'linkedin_url'=> ['nullable','url'],
+                    'website_url' => ['nullable','url'],
+                    'reminders'   => ['sometimes','array'],
+                ])->validate();
+
+                // Find target contact by match strategy
+                $contact = null;
+                if ($match === 'id' && !empty($data['id'])) {
+                    $contact = Contact::where('owner_user_id',$uid)->find($data['id']);
+                } elseif ($match === 'email' && !empty($data['email'])) {
+                    $contact = Contact::where('owner_user_id',$uid)->where('email',$data['email'])->first();
+                } elseif ($match === 'phone' && !empty($data['phone'])) {
+                    $contact = Contact::where('owner_user_id',$uid)->where('phone',$data['phone'])->first();
+                } elseif ($match === 'name_company' && !empty($data['name'])) {
+                    $q = Contact::where('owner_user_id',$uid)->where('name',$data['name']);
+                    if (!empty($data['company'])) $q->where('company',$data['company']);
+                    $contact = $q->first();
+                }
+
+                $reminders = $data['reminders'] ?? [];
+                unset($data['reminders'], $data['id']);
+
+                if ($contact) {
+                    $contact->fill($data)->save();
+                    $updated++;
+                } else {
+                    $contact = new Contact($data);
+                    $contact->owner_user_id = $uid;
+                    $contact->save();
+                    $created++;
+                }
+
+                // Upsert nested reminders
+                foreach ($reminders as $rem) {
+                    $remData = validator($rem, [
+                        'id'      => ['sometimes','integer'],
+                        'title'   => ['required','string','max:255'],
+                        'note'    => ['nullable','string'],
+                        'due_at'  => ['nullable','date'],
+                        'status'  => ['nullable', Rule::in(['pending','done','skipped','cancelled'])],
+                        'channel' => ['nullable', Rule::in(['app','email','calendar'])],
+                    ])->validate();
+
+                    $model = null;
+                    if (!empty($remData['id'])) {
+                        $model = Reminder::where('owner_user_id',$uid)
+                            ->where('contact_id',$contact->id)
+                            ->find($remData['id']);
+                    }
+
+                    $remData['owner_user_id'] = $uid;
+                    $remData['contact_id']    = $contact->id;
+                    if (!empty($remData['due_at'])) $remData['due_at'] = Carbon::parse($remData['due_at']);
+
+                    if ($model) {
+                        $model->fill($remData)->save();
+                        $remUpdated++;
+                    } else {
+                        Reminder::create($remData);
+                        $remCreated++;
+                    }
+                }
+
+                $results[] = ['contact_id' => $contact->id];
+            }
+        });
+
+        return response()->json(compact('created','updated','remCreated','remUpdated','results'));
+    }
+
+    /** POST /contacts/bulk-delete { "ids":[...] } */
+    public function bulkDelete(Request $r)
+    {
+        $uid = $r->user()->id;
+        $data = $r->validate(['ids'=>['required','array','min:1'],'ids.*'=>'integer']);
+        $count = Contact::where('owner_user_id',$uid)->whereIn('id',$data['ids'])->delete();
+        return response()->json(['deleted'=>$count]);
+    }
 }
