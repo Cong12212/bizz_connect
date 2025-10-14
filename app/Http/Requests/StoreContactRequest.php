@@ -19,7 +19,7 @@ class StoreContactRequest extends FormRequest
             'notes'      => 'nullable|string',
             'company_id' => 'nullable|integer|exists:companies,id',
 
-            // tích hợp tag
+            
             'tag_ids'    => 'nullable|array',
             'tag_ids.*'  => 'integer|exists:tags,id',
             'tag_names'  => 'nullable|array',

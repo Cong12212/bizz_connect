@@ -15,8 +15,8 @@ class User extends Authenticatable implements MustVerifyEmail
     use HasApiTokens, HasFactory, Notifiable;
 
     /**
-     * Nếu DB của bạn có thêm các cột như phone, avatar_url, locale, timezone
-     * thì nên thêm vào fillable cho tiện mass assignment.
+     * If your DB has additional columns like phone, avatar_url, locale, timezone
+     * then add them to fillable for convenient mass assignment.
      */
     protected $fillable = [
         'name', 'email', 'password',
@@ -30,13 +30,13 @@ class User extends Authenticatable implements MustVerifyEmail
     ];
 
     /**
-     * Expose 2 computed fields khi serialize sang JSON.
+     * Expose 2 computed fields when serializing to JSON.
      */
     protected $appends = ['is_plus', 'effective_plan'];
 
     /* ===================== Relationships ===================== */
 
-    // N-n qua bảng pivot company_user (đã có role + softDeletes)
+    // N-N via company_user pivot table (includes role + softDeletes)
     public function companies()
     {
         return $this->belongsToMany(Company::class)
@@ -44,7 +44,7 @@ class User extends Authenticatable implements MustVerifyEmail
             ->withTimestamps();
     }
 
-    // 1-n: các subscription cấp cá nhân (user_id)
+    // 1-N: personal subscriptions (user_id)
     public function subscriptions()
     {
         return $this->hasMany(Subscription::class);
@@ -52,17 +52,17 @@ class User extends Authenticatable implements MustVerifyEmail
 
     /* ===================== Accessors ===================== */
 
-    // User có Plus? (có sub cá nhân active hoặc thuộc công ty có sub active)
+    // Does user have Plus? (has active personal sub or belongs to company with active sub)
     public function getIsPlusAttribute(): bool
     {
-        // 1) Plus cá nhân
+        // 1) Personal Plus
         $hasPersonal = $this->subscriptions()
             ->active()
             ->whereIn('plan', ['pro', 'pro_plus'])
             ->exists();
         if ($hasPersonal) return true;
 
-        // 2) Plus công ty (bất kỳ công ty nào user thuộc về)
+        // 2) Company Plus (any company user belongs to)
         $companyIds = $this->companies()->pluck('companies.id');
         if ($companyIds->isEmpty()) return false;
 
@@ -73,7 +73,7 @@ class User extends Authenticatable implements MustVerifyEmail
             ->exists();
     }
 
-    // Kế thừa plan hiệu lực: ưu tiên cá nhân > công ty > free
+    // Effective plan inheritance: personal > company > free
     public function getEffectivePlanAttribute(): string
     {
         $personal = $this->subscriptions()

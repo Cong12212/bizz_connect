@@ -10,15 +10,15 @@ return new class extends Migration {
     {
         if (!Schema::hasTable('contact_reminder')) {
             Schema::create('contact_reminder', function (Blueprint $t) {
-                // $t->engine = 'InnoDB'; // bật nếu bạn muốn chỉ định engine
+                // $t->engine = 'InnoDB'; // enable if you want to specify engine
                 $t->unsignedBigInteger('contact_id');
                 $t->unsignedBigInteger('reminder_id');
                 $t->timestamps();
 
-                // Khóa tổng hợp chống trùng
+                // Composite key to prevent duplicates
                 $t->primary(['contact_id','reminder_id'], 'contact_reminder_pk');
 
-                // Index đơn lẻ để tối ưu truy vấn theo 1 phía
+                // Single indexes to optimize queries from one side
                 $t->index('contact_id',  'contact_reminder_contact_idx');
                 $t->index('reminder_id', 'contact_reminder_reminder_idx');
 
@@ -33,8 +33,8 @@ return new class extends Migration {
             });
         }
 
-        // Backfill: đưa contact chính (reminders.contact_id) vào pivot nếu chưa có.
-        // Dùng anti-join để tránh duplicate và đảm bảo contact/reminder đều tồn tại.
+        // Backfill: add primary contact (reminders.contact_id) to pivot if not exists.
+        // Use anti-join to avoid duplicates and ensure contact/reminder both exist.
         // MySQL:
         DB::statement("
             INSERT INTO contact_reminder (contact_id, reminder_id, created_at, updated_at)

@@ -14,7 +14,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $tz = config('app.timezone', 'UTC');
 
-        // Ép toàn bộ date trong JSON về TZ của app, không còn "Z"
+        // Force all dates in JSON to app TZ, no more "Z"
         Carbon::serializeUsing(function (Carbon $c) use ($tz) {
             return $c->copy()->setTimezone($tz)->toIso8601String(); // 2025-10-12T21:17:00+07:00
         });

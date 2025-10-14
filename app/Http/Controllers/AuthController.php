@@ -13,7 +13,7 @@ use App\Models\User;
 
 class AuthController extends Controller
 {
-    // Đăng ký: tạo user + gửi mail verify
+    // Register: create user + send verification email
     public function register(Request $r)
     {
         $data = $r->validate([
@@ -38,7 +38,7 @@ class AuthController extends Controller
         ], 201);
     }
 
-    // Đăng nhập
+    // Login
    public function login(Request $r)
 {
     $r->validate(['email' => 'required|email', 'password' => 'required']);
@@ -59,7 +59,7 @@ class AuthController extends Controller
     public function me(Request $r)      { return $r->user(); }
     public function logout(Request $r)  { $r->user()->currentAccessToken()?->delete(); return ['ok'=>true]; }
 
-    // Gửi lại email verify
+    // Resend verification email
     public function resendVerification(Request $r)
     {
         if ($r->user()->hasVerifiedEmail()) {
@@ -70,13 +70,11 @@ class AuthController extends Controller
     }
 
     /**
-     * VERIFY EMAIL - STATELESS (không yêu cầu đang đăng nhập)
-     * Hỗ trợ thêm ?login=1 để "verify + login":
-     *   - Nếu login=1 và bạn muốn về FE với mã 1 lần (an toàn): trả về redirect kèm #code=...
-     *   - (Tuỳ chọn) Nếu muốn trả token JSON trực tiếp, đổi $issueTokenDirect = true;
+     * VERIFY EMAIL - STATELESS (no login required)
+     * Support ?login=1 for "verify + login":
+     *   - If login=1 and you want to return to FE with one-time code (secure): return redirect with #code=...
+     *   - (Optional) If you want to return token JSON directly, set $issueTokenDirect = true;
      */
-    // app/Http/Controllers/AuthController.php
-// app/Http/Controllers/AuthController.php
 public function verifyEmail(Request $request, $id, $hash)
 {
     if (! \Illuminate\Support\Facades\URL::hasValidSignature($request)) {
@@ -93,26 +91,26 @@ public function verifyEmail(Request $request, $id, $hash)
         event(new \Illuminate\Auth\Events\Verified($user));
     }
 
-    // ➜ về FE trang báo thành công (kèm email nếu muốn hiển thị)
+    // ➜ Redirect to FE success page (with email if you want to display)
     $fe = rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/');
     return redirect()->away($fe . '/verify-success?email=' . urlencode($user->email));
 }
 
 
 
-    // Đổi magic code -> token (dùng 1 lần)
+    // Exchange magic code -> token (one-time use)
     public function magicExchange(Request $r)
     {
         $data = $r->validate(['code' => 'required|string']);
         $cacheKey = 'magic:'.$data['code'];
 
-        $userId = Cache::pull($cacheKey); // lấy và xoá -> chỉ dùng 1 lần
+        $userId = Cache::pull($cacheKey); // get and delete -> one-time use only
         if (! $userId) {
             return response()->json(['message' => 'Invalid or expired code'], 400);
         }
 
         $user  = User::findOrFail($userId);
-        // (Tuỳ chọn) đặt TTL cho token: now()->addMinutes(60)
+        // (Optional) set TTL for token: now()->addMinutes(60)
         $token = $user->createToken('api')->plainTextToken;
 
         return response()->json([
@@ -129,16 +127,16 @@ public function verifyEmail(Request $request, $id, $hash)
     ]);
 
     $user = User::where('email', $data['email'])->first();
-    // Tránh lộ thông tin tồn tại email: vẫn trả về message OK
+    // Prevent email enumeration: still return OK message
     if (!$user) return response()->json(['message' => 'If the email exists, a code has been sent'], 200);
 
-    $code = (string) random_int(100000, 999999); // 6 số
-    $ttl  = 10; // phút
+    $code = (string) random_int(100000, 999999); // 6 digits
+    $ttl  = 10; // minutes
 
     $cacheKey = 'pwreset:'.$user->id;
     Cache::put($cacheKey, [
         'code' => $code,
-        'hash' => Hash::make($data['new_password']), // lưu HASH của mật khẩu mới
+        'hash' => Hash::make($data['new_password']), // store HASH of new password
     ], now()->addMinutes($ttl));
 
     try {
@@ -151,7 +149,7 @@ public function verifyEmail(Request $request, $id, $hash)
 }
 
 /**
- * (tuỳ chọn) B1b: gửi lại mã cũ / mã mới
+ * (Optional) B1b: resend old code / new code
  * body: { email }
  */
 public function passwordResend(Request $r)
@@ -164,7 +162,7 @@ public function passwordResend(Request $r)
     $payload = Cache::get($cacheKey);
     if (!$payload) return response()->json(['message' => 'No pending reset. Please start again.'], 400);
 
-    // Phát mã mới để an toàn
+    // Generate new code for security
     $code = (string) random_int(100000, 999999);
     $payload['code'] = $code;
     Cache::put($cacheKey, $payload, now()->addMinutes(10));
@@ -174,7 +172,7 @@ public function passwordResend(Request $r)
 }
 
 /**
- * B2: Xác minh mã & đổi mật khẩu (PUBLIC, throttle)
+ * B2: Verify code & change password (PUBLIC, throttle)
  * body: { email, code }
  */
 public function passwordVerify(Request $r)
@@ -197,11 +195,11 @@ public function passwordVerify(Request $r)
         return response()->json(['message' => 'Invalid code'], 400);
     }
 
-    // cập nhật mật khẩu: dùng HASH đã lưu
+    // Update password: use stored HASH
     $user->password = $payload['hash'];
     $user->save();
 
-    // Huỷ mã + (khuyến nghị) revoke token cũ
+    // Invalidate code + (recommended) revoke old tokens
     Cache::forget($cacheKey);
     try { $user->tokens()->delete(); } catch (\Throwable $e) {}
 

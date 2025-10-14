@@ -9,13 +9,13 @@ return new class extends Migration {
     Schema::create('reminders', function (Blueprint $t) {
       $t->id();
       $t->foreignId('contact_id')->constrained('contacts')->cascadeOnDelete();
-      $t->foreignId('owner_user_id')->constrained('users')->cascadeOnDelete(); // người được nhắc
+      $t->foreignId('owner_user_id')->constrained('users')->cascadeOnDelete(); 
       $t->string('title');
       $t->text('note')->nullable();
       $t->dateTime('due_at')->index();
-      $t->string('status')->default('pending')->index();  // pending|done|skipped|cancelled
-      $t->string('channel')->default('app');              // app|email|calendar
-      $t->string('external_event_id')->nullable();        // id sự kiện nếu sync lịch
+      $t->string('status')->default('pending')->index();  
+      $t->string('channel')->default('app');             
+      $t->string('external_event_id')->nullable();      
       $t->timestamps();
       $t->softDeletes();
     });

@@ -4,30 +4,32 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
-        Schema::create('contacts', function (Blueprint $t) {
+        Schema::create('contacts', function (Blueprint $t)
+        {
             $t->id();
 
-            // Chủ sở hữu (liên kết user)
+            // Owner (link to user)
             $t->foreignId('owner_user_id')
               ->constrained('users')
               ->cascadeOnDelete();
 
-            // Thông tin chính
+            // Main information
             $t->string('name');
             $t->string('job_title')->nullable();
-            $t->string('company')->nullable();      // <-- chỉ 1 lần
+            $t->string('company')->nullable();      // <-- only once
 
             $t->string('email')->nullable();
             $t->string('phone')->nullable();
 
-            // Khớp với FE
+            // Match with FE
             $t->string('address')->nullable();
             $t->text('notes')->nullable();
 
-            // Meta (tuỳ chọn)
+            // Meta (optional)
             $t->string('linkedin_url')->nullable();
             $t->string('website_url')->nullable();
             $t->text('ocr_raw')->nullable();

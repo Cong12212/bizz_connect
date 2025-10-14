@@ -13,7 +13,7 @@ return new class extends Migration {
       $t->foreignId('to_user_id')->nullable()->constrained('users')->nullOnDelete();
       $t->string('share_link_token')->nullable()->unique(); // e-card link
       $t->string('status')->default('pending')->index();    // pending|accepted|declined|expired
-      $t->json('permissions')->nullable();                  // read|clone|edit hạn chế
+      $t->json('permissions')->nullable();                 
       $t->text('message')->nullable();
       $t->timestamps();
     });

@@ -20,7 +20,6 @@ class BillingController extends Controller
         $user = $req->user();
 
         return DB::transaction(function() use ($user, $data) {
-            // hủy sub cá nhân đang active (nếu có)
             Subscription::where('user_id', $user->id)
                 ->active()
                 ->update(['status' => 'canceled', 'current_period_end' => now()]);

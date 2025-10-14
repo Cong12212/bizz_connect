@@ -11,7 +11,7 @@ return new class extends Migration {
     $t->foreignId('user_id')->nullable()->constrained('users')->cascadeOnDelete();
     $t->foreignId('company_id')->nullable()->constrained('companies')->cascadeOnDelete();
 
-    // CHỈNH ĐỘ DÀI
+ 
     $t->string('type', 32);      // email|calendar ...
     $t->string('provider', 32);  // gmail|o365|outlook|...
     $t->text('access_token')->nullable();

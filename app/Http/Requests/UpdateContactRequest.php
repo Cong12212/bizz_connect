@@ -18,12 +18,12 @@ class UpdateContactRequest extends FormRequest
             'address'    => 'nullable|string|max:255',
             'notes'      => 'nullable|string',
 
-            // tags (tuỳ chọn)
+         
             'tag_ids'    => 'nullable|array',
             'tag_ids.*'  => 'integer|exists:tags,id',
             'tag_names'  => 'nullable|array',
             'tag_names.*'=> 'string|max:100',
-            // nếu muốn sync toàn bộ thay vì chỉ attach
+          
             'sync_tags'  => 'nullable|boolean',
         ];
     }

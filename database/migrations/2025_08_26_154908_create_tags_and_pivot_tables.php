@@ -13,7 +13,7 @@ return new class extends Migration {
       $t->string('name');
       $t->timestamps();
 
-      // unique theo phạm vi sở hữu
+      // unique by ownership scope
       $t->unique(['company_id','owner_user_id','name']);
     });
 

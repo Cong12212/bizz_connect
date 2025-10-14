@@ -13,14 +13,14 @@ class TagController extends Controller
         $per = min(100, (int) $r->query('per_page', 100));
         $q = Tag::query()
             ->where('owner_user_id', $r->user()->id)
-            ->withCount('contacts'); // <— để FE có contacts_count
+            ->withCount('contacts'); // so FE has contacts_count
 
         if ($term = trim((string) $r->query('q', ''))) {
-            $term = ltrim($term, '#');                 // bỏ dấu # nếu gõ #vip
+            $term = ltrim($term, '#');                 // remove # if typed #vip
             $q->where('name', 'like', "%{$term}%");
         }
 
-        // sort theo name hoặc số lượng contacts
+        // sort by name or number of contacts
         $sort = (string) $r->query('sort', 'name');    // name|-name|count|-count
         $sort === 'name'   ? $q->orderBy('name')
       : ($sort === '-name' ? $q->orderBy('name', 'desc')
@@ -36,7 +36,7 @@ class TagController extends Controller
         $data = $r->validate(['name' => 'required|string|max:100']);
         $name = $this->normalize($data['name']);
 
-        // chặn trùng trong phạm vi user
+        // prevent duplicate within user scope
         $exists = Tag::where('owner_user_id', $r->user()->id)->where('name', $name)->exists();
         if ($exists) {
             return response()->json(['message' => 'This tag name already exists.'], 422);
@@ -78,7 +78,7 @@ class TagController extends Controller
 
     private function normalize(string $name): string
     {
-        // bỏ # đầu, trim khoảng trắng, rút gọn space giữa các từ
+        // remove leading #, trim whitespace, reduce spaces between words
         $name = trim(ltrim($name, '#'));
         $name = preg_replace('/\s+/', ' ', $name) ?? $name;
         return $name;

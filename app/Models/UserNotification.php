@@ -25,7 +25,7 @@ class UserNotification extends Model
         return $row;
     }
 
-    /** Giữ tối đa 50 bản ghi / user */
+    /** Keep maximum 50 records per user */
     public static function pruneForUser(int $userId): void
     {
         $idsToKeep = static::where('owner_user_id', $userId)

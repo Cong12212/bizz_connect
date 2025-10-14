@@ -11,19 +11,20 @@ use App\Exports\ContactsExport;
 use App\Exports\ContactsTemplateExport;
 use App\Imports\ContactsImport;
 use App\Models\UserNotification;
+use Carbon\Carbon;
 
 class ContactController extends Controller
 {
     /**
      * GET /contacts
-     * Hỗ trợ:
-     * - q: text search (name/email/phone/company) + hashtag trong q: #vip #design
-     * - tag_ids: "1,2,3" hoặc [1,2,3]
-     * - tags: "vip,design" hoặc "#vip,#design"
-     * - tag_mode: any|all (mặc định any)
-     * - without_tag: id hoặc name (loại trừ những contact đang có tag này)
-     * - sort: name|-name|id|-id (mặc định -id)
-     * - per_page: tối đa 100
+     * Filters:
+     *  - q (+hashtags #vip)
+     *  - tag_ids, tags, tag_mode(any|all)
+     *  - without_tag (id or name)
+     *  - with_reminder / without_reminder (+status/after/before)
+     *  - exclude_ids
+     *  - sort: name|-name|id|-id (default -id)
+     *  - per_page <= 100
      */
     public function index(Request $r)
     {
@@ -32,48 +33,40 @@ class ContactController extends Controller
         $q = Contact::query()
             ->where('owner_user_id', $r->user()->id);
 
-        // --- Parse q: tách hashtag ra khỏi phần text ---
+        // ===== q + hashtag =====
         $rawQ         = trim((string) $r->query('q', ''));
-        $hashTagNames = $this->extractHashtags($rawQ); // ['vip','design', ...]
-        $textTerm     = $this->stripHashtags($rawQ);   // phần q không có #tag
+        $hashTagNames = $this->extractHashtags($rawQ);
+        $textTerm     = $this->stripHashtags($rawQ);
 
         if ($textTerm !== '') {
             $term = "%{$textTerm}%";
             $q->where(function ($w) use ($term) {
                 $w->where('name', 'like', $term)
-                    ->orWhere('email', 'like', $term)
-                    ->orWhere('phone', 'like', $term)
-                    ->orWhere('company', 'like', $term);
+                  ->orWhere('email', 'like', $term)
+                  ->orWhere('phone', 'like', $term)
+                  ->orWhere('company', 'like', $term);
             });
         }
 
-        // --- tag_ids ---
+        // ===== tag_ids / tags + mode =====
         $tagIds = [];
-        if ($tagIdsParam = $r->query('tag_ids')) {
-            $tagIds = is_array($tagIdsParam) ? $tagIdsParam : explode(',', (string) $tagIdsParam);
+        if ($p = $r->query('tag_ids')) {
+            $tagIds = is_array($p) ? $p : explode(',', (string)$p);
             $tagIds = array_values(array_filter(array_map('intval', $tagIds)));
         }
 
-        // --- tags (tên) ---
         $tagNames = [];
-        if ($tagNamesParam = $r->query('tags')) {
-            $tagNames = is_array($tagNamesParam) ? $tagNamesParam : explode(',', (string) $tagNamesParam);
-            $tagNames = array_map(function ($s) {
-                $s = trim((string) $s);
-                return ltrim($s, '#');
-            }, $tagNames);
-            $tagNames = array_values(array_filter($tagNames, fn($s) => $s !== ''));
+        if ($p = $r->query('tags')) {
+            $tagNames = is_array($p) ? $p : explode(',', (string)$p);
+            $tagNames = array_values(array_filter(array_map(fn($s)=>ltrim(trim($s),'#'), $tagNames)));
         }
 
-        // Gộp hashtag trong q + tags param
         if (!empty($hashTagNames)) {
             $tagNames = array_values(array_unique(array_merge($tagNames, $hashTagNames)));
         }
 
-        // --- Áp dụng filter theo tag_ids / tags (names) ---
         if (!empty($tagIds) || !empty($tagNames)) {
             $mode = $r->query('tag_mode', 'any'); // any|all
-
             if (!empty($tagIds)) {
                 if ($mode === 'all') {
                     foreach ($tagIds as $id) {
@@ -83,7 +76,6 @@ class ContactController extends Controller
                     $q->whereHas('tags', fn($t) => $t->whereIn('tags.id', $tagIds));
                 }
             }
-
             if (!empty($tagNames)) {
                 if ($mode === 'all') {
                     foreach ($tagNames as $name) {
@@ -95,31 +87,80 @@ class ContactController extends Controller
             }
         }
 
-        // --- WITHOUT TAG (id hoặc name) ---
+        // ===== without_tag =====
         if ($r->filled('without_tag')) {
             $val = $r->query('without_tag');
-            $q->whereDoesntHave('tags', function ($t) use ($val, $r) {
+            $q->whereDoesntHave('tags', function ($t) use ($val) {
                 if (is_numeric($val)) {
-                    $t->where('tags.id', (int) $val);
+                    $t->where('tags.id', (int)$val);
                 } else {
-                    $t->where('tags.name', ltrim((string) $val, '#'));
+                    $t->where('tags.name', ltrim((string)$val, '#'));
                 }
             });
         }
 
-        // --- Sort ---
+        // ===== reminders filter (via pivot) =====
+        if ($r->boolean('without_reminder')) {
+            $status = $r->query('status');
+            $after  = $r->query('after');
+            $before = $r->query('before');
+
+            $q->whereNotExists(function ($sub) use ($status, $after, $before) {
+                $sub->selectRaw(1)
+                    ->from('contact_reminder as cr')
+                    ->join('reminders as r', 'r.id', '=', 'cr.reminder_id')
+                    ->whereColumn('cr.contact_id', 'contacts.id')
+                    ->whereColumn('r.owner_user_id', 'contacts.owner_user_id');
+
+                if (!empty($status)) $sub->where('r.status', $status);
+                if (!empty($after))  $sub->where('r.due_at', '>=', Carbon::parse($after));
+                if (!empty($before)) $sub->where('r.due_at', '<=', Carbon::parse($before));
+            });
+        }
+
+        if ($r->boolean('with_reminder')) {
+            $status = $r->query('status');
+            $after  = $r->query('after');
+            $before = $r->query('before');
+
+            $q->whereExists(function ($sub) use ($status, $after, $before) {
+                $sub->selectRaw(1)
+                    ->from('contact_reminder as cr')
+                    ->join('reminders as r', 'r.id', '=', 'cr.reminder_id')
+                    ->whereColumn('cr.contact_id', 'contacts.id')
+                    ->whereColumn('r.owner_user_id', 'contacts.owner_user_id');
+
+                if (!empty($status)) $sub->where('r.status', $status);
+                if (!empty($after))  $sub->where('r.due_at', '>=', Carbon::parse($after));
+                if (!empty($before)) $sub->where('r.due_at', '<=', Carbon::parse($before));
+            });
+        }
+
+        // ===== exclude_ids =====
+        if ($r->filled('exclude_ids')) {
+            $ids = $r->query('exclude_ids');
+            $ids = is_array($ids) ? $ids : explode(',', (string)$ids);
+            $ids = array_values(array_filter(array_map('intval', $ids)));
+            if (!empty($ids)) {
+                $q->whereNotIn('contacts.id', $ids);
+            }
+        }
+
+        // ===== Sort =====
         $sort = (string) $r->query('sort', '-id');
         $sort === 'name'   ? $q->orderBy('name')
       : ($sort === '-name' ? $q->orderBy('name', 'desc')
       : ($sort === 'id'    ? $q->orderBy('id')
                            : $q->orderBy('id', 'desc')));
 
-        return $q->with('tags')->paginate($per);
+        // eager-load tags
+        $q->with(['tags' => fn($t) => $t->where('tags.owner_user_id', $r->user()->id)]);
+
+        return $q->paginate($per);
     }
 
     /**
      * POST /contacts
-     * Nhận đầy đủ field theo migration/model.
      */
     public function store(Request $r)
     {
@@ -139,7 +180,7 @@ class ContactController extends Controller
                 Rule::exists('contacts','id')->where(fn($q) => $q->where('owner_user_id', $r->user()->id)),
             ],
             'search_text'     => 'nullable|string',
-            'source'          => 'nullable|string|max:50', // default 'manual' trong migration
+            'source'          => 'nullable|string|max:50',
         ]);
 
         $data['owner_user_id'] = $r->user()->id;
@@ -149,13 +190,14 @@ class ContactController extends Controller
 
         $c = Contact::create($data);
 
-         UserNotification::log($r->user()->id, [
-        'type'        => 'contact.created',
-        'title'       => 'New contact created',
-        'body'        => $c->name . ($c->company ? ' · '.$c->company : ''),
-        'data'        => ['contact_id' => $c->id],
-        'contact_id'  => $c->id,
-    ]);
+        UserNotification::log($r->user()->id, [
+            'type'        => 'contact.created',
+            'title'       => 'New contact created',
+            'body'        => $c->name . ($c->company ? ' · '.$c->company : ''),
+            'data'        => ['contact_id' => $c->id],
+            'contact_id'  => $c->id,
+        ]);
+
         return response()->json(['data' => $c->load('tags')], 201);
     }
 
@@ -165,7 +207,9 @@ class ContactController extends Controller
     public function show(Request $r, Contact $contact)
     {
         $this->authorizeOwner($r, $contact);
-        return ['data' => $contact->load('tags')];
+        $uid = $r->user()->id;
+        $contact->load(['tags' => fn($t) => $t->where('tags.owner_user_id', $uid)]);
+        return ['data' => $contact];
     }
 
     /**
@@ -197,7 +241,7 @@ class ContactController extends Controller
             'source'          => 'sometimes|nullable|string|max:50',
         ]);
 
-        // Chặn vòng A↔B đơn giản
+        // Prevent circular duplicate A↔B
         if (!empty($payload['duplicate_of_id'])) {
             $target = Contact::select('id','duplicate_of_id')
                 ->where('owner_user_id', $r->user()->id)
@@ -224,7 +268,6 @@ class ContactController extends Controller
 
     /**
      * POST /contacts/{contact}/tags
-     * Body: { ids?: number[], names?: string[] }
      */
     public function attachTags(Request $r, Contact $contact)
     {
@@ -237,27 +280,32 @@ class ContactController extends Controller
             'names.*' => 'string',
         ]);
 
-        $ids = $body['ids'] ?? [];
+        $ids = [];
+
+        if (!empty($body['ids'])) {
+            $ids = Tag::where('owner_user_id', $r->user()->id)
+                ->whereIn('id', $body['ids'])
+                ->pluck('id')->all();
+        }
 
         if (!empty($body['names'])) {
             foreach ($body['names'] as $name) {
                 $name = ltrim(trim($name), '#');
                 if ($name === '') continue;
 
-                // tạo tag theo phạm vi user hiện tại
-                $tag = Tag::firstOrCreate([
-                    'owner_user_id' => $r->user()->id,
-                    'name'          => $name,
-                ]);
+                $tag = Tag::firstOrCreate(
+                    ['owner_user_id' => $r->user()->id, 'name' => $name],
+                    []
+                );
                 $ids[] = $tag->id;
             }
         }
 
-        if (!empty($ids)) {
+        if ($ids) {
             $contact->tags()->syncWithoutDetaching(array_unique($ids));
         }
 
-        return $contact->fresh()->load('tags');
+        return $contact->fresh()->load(['tags' => fn($t) => $t->where('tags.owner_user_id', $r->user()->id)]);
     }
 
     /**
@@ -266,8 +314,11 @@ class ContactController extends Controller
     public function detachTag(Request $r, Contact $contact, Tag $tag)
     {
         $this->authorizeOwner($r, $contact);
+        abort_unless($tag->owner_user_id === $r->user()->id, 403, 'Tag not owned by you');
+
         $contact->tags()->detach($tag->id);
-        return $contact->fresh()->load('tags');
+
+        return $contact->fresh()->load(['tags' => fn($t) => $t->where('tags.owner_user_id', $r->user()->id)]);
     }
 
     /* ================== Helpers ================== */
@@ -277,7 +328,6 @@ class ContactController extends Controller
         abort_unless($c->owner_user_id === $r->user()->id, 403);
     }
 
-    /** Lấy danh sách hashtag (không kèm dấu #), lower-case */
     private function extractHashtags(string $q): array
     {
         if ($q === '') return [];
@@ -287,7 +337,6 @@ class ContactController extends Controller
         return array_values(array_unique(array_filter($names, fn($s) => $s !== '')));
     }
 
-    /** Loại bỏ phần #tag ra khỏi chuỗi query để còn lại text search */
     private function stripHashtags(string $q): string
     {
         if ($q === '') return '';
@@ -296,25 +345,20 @@ class ContactController extends Controller
     }
 
     /**
-     * GET /contacts/export?format=xlsx|csv + (q, tags, tag_ids, tag_mode, sort, per_page...) như index()
-     * Trả về file Excel/CSV theo filter hiện tại
+     * GET /contacts/export
      */
     public function export(Request $r)
     {
         $query = Contact::query()
             ->where('owner_user_id', $r->user()->id)
-            ->with('tags');
+            ->with(['tags' => fn($t) => $t->where('tags.owner_user_id', $r->user()->id)]);
 
-        // --- ids (tùy chọn) ---
+        // ids (optional)
         $ids = $r->input('ids', []);
-        if (is_string($ids)) {
-            $ids = array_filter(array_map('intval', explode(',', $ids)));
-        }
-        if (is_array($ids) && !empty($ids)) {
-            $query->whereIn('id', $ids);
-        }
+        if (is_string($ids)) $ids = array_filter(array_map('intval', explode(',', $ids)));
+        if (is_array($ids) && !empty($ids)) $query->whereIn('id', $ids);
 
-        // --- các filter còn lại (q + hashtag trong q, tag_ids, tags, tag_mode, sort) y hệt index() ---
+        // q + hashtags
         $rawQ         = trim((string) $r->query('q', ''));
         $hashTagNames = $this->extractHashtags($rawQ);
         $textTerm     = $this->stripHashtags($rawQ);
@@ -323,12 +367,13 @@ class ContactController extends Controller
             $term = "%{$textTerm}%";
             $query->where(function ($w) use ($term) {
                 $w->where('name', 'like', $term)
-                    ->orWhere('email', 'like', $term)
-                    ->orWhere('phone', 'like', $term)
-                    ->orWhere('company', 'like', $term);
+                  ->orWhere('email', 'like', $term)
+                  ->orWhere('phone', 'like', $term)
+                  ->orWhere('company', 'like', $term);
             });
         }
 
+        // tags
         $tagIds = [];
         if ($p = $r->query('tag_ids')) {
             $tagIds = is_array($p) ? $p : explode(',', (string)$p);
@@ -367,18 +412,61 @@ class ContactController extends Controller
             }
         }
 
-        // --- WITHOUT TAG (id hoặc name) cho export ---
+        // without_tag
         if ($r->filled('without_tag')) {
             $val = $r->query('without_tag');
             $query->whereDoesntHave('tags', function ($t) use ($val) {
-                if (is_numeric($val)) {
-                    $t->where('tags.id', (int) $val);
-                } else {
-                    $t->where('tags.name', ltrim((string)$val, '#'));
-                }
+                if (is_numeric($val)) $t->where('tags.id', (int) $val);
+                else $t->where('tags.name', ltrim((string)$val, '#'));
             });
         }
 
+        // exclude_ids
+        if ($r->filled('exclude_ids')) {
+            $eids = $r->query('exclude_ids');
+            $eids = is_array($eids) ? $eids : explode(',', (string)$eids);
+            $eids = array_values(array_filter(array_map('intval', $eids)));
+            if (!empty($eids)) $query->whereNotIn('contacts.id', $eids);
+        }
+
+        // reminders filter (pivot)
+        if ($r->boolean('without_reminder')) {
+            $status = $r->query('status');
+            $after  = $r->query('after');
+            $before = $r->query('before');
+
+            $query->whereNotExists(function ($sub) use ($status, $after, $before) {
+                $sub->selectRaw(1)
+                    ->from('contact_reminder as cr')
+                    ->join('reminders as r', 'r.id', '=', 'cr.reminder_id')
+                    ->whereColumn('cr.contact_id', 'contacts.id')
+                    ->whereColumn('r.owner_user_id', 'contacts.owner_user_id');
+
+                if (!empty($status)) $sub->where('r.status', $status);
+                if (!empty($after))  $sub->where('r.due_at', '>=', Carbon::parse($after));
+                if (!empty($before)) $sub->where('r.due_at', '<=', Carbon::parse($before));
+            });
+        }
+
+        if ($r->boolean('with_reminder')) {
+            $status = $r->query('status');
+            $after  = $r->query('after');
+            $before = $r->query('before');
+
+            $query->whereExists(function ($sub) use ($status, $after, $before) {
+                $sub->selectRaw(1)
+                    ->from('contact_reminder as cr')
+                    ->join('reminders as r', 'r.id', '=', 'cr.reminder_id')
+                    ->whereColumn('cr.contact_id', 'contacts.id')
+                    ->whereColumn('r.owner_user_id', 'contacts.owner_user_id');
+
+                if (!empty($status)) $sub->where('r.status', $status);
+                if (!empty($after))  $sub->where('r.due_at', '>=', Carbon::parse($after));
+                if (!empty($before)) $sub->where('r.due_at', '<=', Carbon::parse($before));
+            });
+        }
+
+        // sort
         $sort = (string)$r->query('sort', '-id');
         $sort === 'name'   ? $query->orderBy('name')
       : ($sort === '-name' ? $query->orderBy('name', 'desc')
@@ -396,23 +484,7 @@ class ContactController extends Controller
             : Excel::download($export, $file, \Maatwebsite\Excel\Excel::XLSX);
     }
 
-    /**
-     * GET /contacts/export-template
-     */
-    public function exportTemplate(Request $r)
-    {
-        $export = new ContactsTemplateExport();
-        $format = strtolower((string)$r->query('format', 'xlsx'));
-
-        return $format === 'csv'
-            ? Excel::download($export, 'contacts_template.csv', \Maatwebsite\Excel\Excel::CSV)
-            : Excel::download($export, 'contacts_template.xlsx', \Maatwebsite\Excel\Excel::XLSX);
-    }
-
-    /**
-     * POST /contacts/import (multipart/form-data: file, match_by=id|email|phone)
-     * Trả về thống kê created/updated/skipped + errors
-     */
+    /** POST /contacts/import … (giữ nguyên phần còn lại) */
     public function import(Request $r)
     {
         $data = $r->validate([
@@ -431,100 +503,6 @@ class ContactController extends Controller
         ]);
     }
 
-    public function bulkUpsert(Request $r)
-    {
-        $uid = $r->user()->id;
-        $payload = $r->validate([
-            'items' => ['required','array','min:1'],
-            'match' => ['nullable', Rule::in(['id','email','phone','name_company'])],
-        ]);
-        $match = $payload['match'] ?? 'id';
-
-        $created = 0; $updated = 0; $remCreated = 0; $remUpdated = 0; $results = [];
-
-        DB::transaction(function () use ($uid, $payload, $match, &$created, &$updated, &$remCreated, &$remUpdated, &$results) {
-            foreach ($payload['items'] as $row) {
-                // Validate contact row
-                $data = validator($row, [
-                    'id'          => ['sometimes','integer'],
-                    'name'        => ['required','string','max:255'],
-                    'email'       => ['nullable','email','max:255'],
-                    'phone'       => ['nullable','string','max:64'],
-                    'company'     => ['nullable','string','max:255'],
-                    'address'     => ['nullable','string'],
-                    'notes'       => ['nullable','string'],
-                    'job_title'   => ['nullable','string','max:255'],
-                    'linkedin_url'=> ['nullable','url'],
-                    'website_url' => ['nullable','url'],
-                    'reminders'   => ['sometimes','array'],
-                ])->validate();
-
-                // Find target contact by match strategy
-                $contact = null;
-                if ($match === 'id' && !empty($data['id'])) {
-                    $contact = Contact::where('owner_user_id',$uid)->find($data['id']);
-                } elseif ($match === 'email' && !empty($data['email'])) {
-                    $contact = Contact::where('owner_user_id',$uid)->where('email',$data['email'])->first();
-                } elseif ($match === 'phone' && !empty($data['phone'])) {
-                    $contact = Contact::where('owner_user_id',$uid)->where('phone',$data['phone'])->first();
-                } elseif ($match === 'name_company' && !empty($data['name'])) {
-                    $q = Contact::where('owner_user_id',$uid)->where('name',$data['name']);
-                    if (!empty($data['company'])) $q->where('company',$data['company']);
-                    $contact = $q->first();
-                }
-
-                $reminders = $data['reminders'] ?? [];
-                unset($data['reminders'], $data['id']);
-
-                if ($contact) {
-                    $contact->fill($data)->save();
-                    $updated++;
-                } else {
-                    $contact = new Contact($data);
-                    $contact->owner_user_id = $uid;
-                    $contact->save();
-                    $created++;
-                }
-
-                // Upsert nested reminders
-                foreach ($reminders as $rem) {
-                    $remData = validator($rem, [
-                        'id'      => ['sometimes','integer'],
-                        'title'   => ['required','string','max:255'],
-                        'note'    => ['nullable','string'],
-                        'due_at'  => ['nullable','date'],
-                        'status'  => ['nullable', Rule::in(['pending','done','skipped','cancelled'])],
-                        'channel' => ['nullable', Rule::in(['app','email','calendar'])],
-                    ])->validate();
-
-                    $model = null;
-                    if (!empty($remData['id'])) {
-                        $model = Reminder::where('owner_user_id',$uid)
-                            ->where('contact_id',$contact->id)
-                            ->find($remData['id']);
-                    }
-
-                    $remData['owner_user_id'] = $uid;
-                    $remData['contact_id']    = $contact->id;
-                    if (!empty($remData['due_at'])) $remData['due_at'] = Carbon::parse($remData['due_at']);
-
-                    if ($model) {
-                        $model->fill($remData)->save();
-                        $remUpdated++;
-                    } else {
-                        Reminder::create($remData);
-                        $remCreated++;
-                    }
-                }
-
-                $results[] = ['contact_id' => $contact->id];
-            }
-        });
-
-        return response()->json(compact('created','updated','remCreated','remUpdated','results'));
-    }
-
-    /** POST /contacts/bulk-delete { "ids":[...] } */
     public function bulkDelete(Request $r)
     {
         $uid = $r->user()->id;

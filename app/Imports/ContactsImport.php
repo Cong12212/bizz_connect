@@ -30,10 +30,10 @@ class ContactsImport implements OnEachRow, WithHeadingRow
     {
         $data = $row->toArray(); // heading row => assoc
 
-        // Chuẩn hóa key về snake_case (phòng người dùng đổi tên cột)
+        // Normalize keys to snake_case (in case user changes column names)
         $data = collect($data)->keyBy(fn($v,$k)=>Str::snake(trim((string)$k)))->all();
 
-        // Skip nếu thiếu name và không có key nào để match
+        // Skip if missing name and no key to match
         $name = trim((string)($data['name'] ?? ''));
         $email = trim((string)($data['email'] ?? ''));
         $phone = trim((string)($data['phone'] ?? ''));
@@ -43,7 +43,7 @@ class ContactsImport implements OnEachRow, WithHeadingRow
             $this->skipped++; return;
         }
 
-        // Tìm bản ghi theo matchBy
+        // Find record by matchBy strategy
         $contact = null;
         if ($this->matchBy === 'id' && $idVal) {
             $contact = Contact::where('owner_user_id', $this->ownerId)->find($idVal);
@@ -53,23 +53,23 @@ class ContactsImport implements OnEachRow, WithHeadingRow
             $contact = Contact::where('owner_user_id', $this->ownerId)->where('phone', $phone)->first();
         }
 
-        // Map các field hợp lệ
+        // Map valid fields
         $payload = Arr::only($data, [
             'name','company','job_title','email','phone','address','notes',
             'linkedin_url','website_url','ocr_raw','duplicate_of_id','search_text','source',
         ]);
 
-        // Ràng buộc cơ bản (name/email)
+        // Basic validation (name/email)
         if (!$contact && empty($payload['name'])) {
-            // Tạo mới cần name
+            // Create requires name
             $this->errors[] = ['row' => $row->getIndex(), 'error' => 'name is required for create'];
             $this->skipped++; return;
         }
 
-        // Chuẩn hóa
+        // Normalize
         $payload['source'] = $payload['source'] ?? 'manual';
         if (isset($payload['duplicate_of_id']) && $payload['duplicate_of_id'] !== null) {
-            // Không cho trỏ tới chính nó khi matchBy = id và id khớp
+            // Don't allow pointing to itself when matchBy = id and id matches
             if ($contact && (int)$payload['duplicate_of_id'] === (int)$contact->id) {
                 $payload['duplicate_of_id'] = null;
             }
@@ -85,7 +85,7 @@ class ContactsImport implements OnEachRow, WithHeadingRow
             $this->created++;
         }
 
-        // Tags: cột "tags" (comma-separated)
+        // Tags: "tags" column (comma-separated)
         if (!empty($data['tags'])) {
             $names = collect(explode(',', (string)$data['tags']))
                 ->map(fn($s)=>trim($s))

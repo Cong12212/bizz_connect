@@ -39,13 +39,13 @@ Route::middleware(['auth:sanctum'])->group(function () {
 });
 
 /**
- * API CHÍNH — yêu cầu ĐĂNG NHẬP + ĐÃ VERIFY
+ * MAIN API — requires LOGIN + VERIFIED
  */
 Route::middleware(['auth:sanctum','verified'])->group(function () {
-    // Export/Import đặt TRƯỚC các route {contact}
+    // Export/Import placed BEFORE {contact} routes
     Route::match(['GET','POST'], '/contacts/export', [ContactController::class, 'export']);
     Route::post('/contacts/import', [ContactController::class, 'import']);
-    // Nếu muốn public template thì đưa ra ngoài group; nếu muốn bảo vệ thì để ở đây.
+    // If you want public template, move outside group; if protected, keep here.
     Route::get('/contacts/export-template', [ContactController::class, 'exportTemplate']);
 
     // CRUD

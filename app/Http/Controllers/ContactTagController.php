@@ -21,7 +21,7 @@ class ContactTagController extends Controller
 
         $ids = $data['ids'] ?? [];
 
-        // Tạo tag từ tên (scope cá nhân)
+        // Create tags from names (personal scope)
         foreach (($data['names'] ?? []) as $name) {
             $tag = Tag::firstOrCreate([
                 'owner_user_id' => $r->user()->id,
@@ -44,7 +44,7 @@ class ContactTagController extends Controller
 
     private function authorizeOwner(Request $r, Contact $c)
     {
-        // chỉ sở hữu cá nhân
+        // personal ownership only
         abort_unless($c->owner_user_id === $r->user()->id, 403);
     }
 }

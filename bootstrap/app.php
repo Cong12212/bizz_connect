@@ -4,7 +4,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
-use Illuminate\Database\QueryException; // <-- THÊM
+use Illuminate\Database\QueryException; // <-- ADD
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -15,7 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Alias middleware cho API
+        // Alias middleware for API
         $middleware->alias([
             'verified' => EnsureEmailIsVerified::class,
         ]);
@@ -26,17 +26,17 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
 
-        // Ép mọi lỗi dưới /api/* trả về JSON (tránh 302/HTML)
+        // Force all errors under /api/* to return JSON (avoid 302/HTML)
         $exceptions->shouldRenderJsonWhen(
             fn ($request, $e) => $request->is('api/*')
         );
 
-        // Tuỳ biến thông báo lỗi DB (ví dụ thiếu bảng Sanctum)
+        // Customize DB error messages (e.g. missing Sanctum table)
         $exceptions->render(function (QueryException $e, $request) {
             if ($request->is('api/*')) {
                 $msg = str_contains($e->getMessage(), 'personal_access_tokens')
-                    ? 'Thiếu bảng Sanctum. Chạy: php artisan migrate'
-                    : 'Lỗi cơ sở dữ liệu.';
+                    ? 'Missing Sanctum table. Run: php artisan migrate'
+                    : 'Database error.';
                 return response()->json(['message' => $msg], 500);
             }
         });
