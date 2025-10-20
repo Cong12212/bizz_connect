@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\URL;        // ← THÊM DÒNG NÀY
 use Illuminate\Support\Carbon;
 use Carbon\CarbonImmutable;
 
@@ -14,17 +15,13 @@ class AppServiceProvider extends ServiceProvider
     {
         $tz = config('app.timezone', 'UTC');
 
-        if (config('app.env') === 'production') {
-        URL::forceScheme('https');
-    }
+        // Force https khi chạy production trên Render
+        if (app()->environment('production')) {
+            URL::forceScheme('https');
+        }
 
-        // Force all dates in JSON to app TZ, no more "Z"
-        Carbon::serializeUsing(function (Carbon $c) use ($tz) {
-            return $c->copy()->setTimezone($tz)->toIso8601String(); // 2025-10-12T21:17:00+07:00
-        });
-
-        CarbonImmutable::serializeUsing(function (CarbonImmutable $c) use ($tz) {
-            return $c->setTimezone($tz)->toIso8601String();
-        });
+        // Chuẩn hoá serialize ngày giờ
+        Carbon::serializeUsing(fn (Carbon $c) => $c->copy()->setTimezone($tz)->toIso8601String());
+        CarbonImmutable::serializeUsing(fn (CarbonImmutable $c) => $c->setTimezone($tz)->toIso8601String());
     }
 }

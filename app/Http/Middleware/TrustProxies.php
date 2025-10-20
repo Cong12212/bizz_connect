@@ -7,13 +7,10 @@ use Illuminate\Http\Request;
 
 class TrustProxies extends Middleware
 {
-    // Tin tất cả proxy (Render đứng trước Nginx/PHP-FPM)
+    // Tin các proxy phía trước (Render đứng trước Nginx/PHP-FPM)
     protected $proxies = '*';
 
-    // Tôn trọng các header X-Forwarded-* để nhận biết HTTPS
-    protected $headers =
-        Request::HEADER_X_FORWARDED_FOR |
-        Request::HEADER_X_FORWARDED_HOST |
-        Request::HEADER_X_FORWARDED_PORT |
-        Request::HEADER_X_FORWARDED_PROTO;
+    // Tôn trọng headers X-Forwarded-* để nhận biết HTTPS
+    protected $headers = Request::HEADER_X_FORWARDED_ALL;
+    // (Hoặc dùng phép OR như bạn đang có cũng được)
 }
