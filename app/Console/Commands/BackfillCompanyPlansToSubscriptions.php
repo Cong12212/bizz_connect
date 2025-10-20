@@ -26,7 +26,7 @@ class BackfillCompanyPlansToSubscriptions extends Command
 
                         Subscription::create([
                             'company_id' => $c->id,
-                            'plan'       => $c->plan, // map nếu bạn đổi tên gói
+                            'plan'       => $c->plan,
                             'status'     => 'active',
                             'current_period_start' => now(),
                             'current_period_end'   => now()->addMonth(),
