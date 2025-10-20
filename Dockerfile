@@ -1,13 +1,18 @@
 FROM webdevops/php-nginx:8.3-alpine
+
 ENV WEB_DOCUMENT_ROOT=/app/public
 ENV PHP_OPCACHE=1
 ENV COMPOSER_ALLOW_SUPERUSER=1
+
 WORKDIR /app
 COPY . .
+
 RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader \
-    && mkdir -p storage bootstrap/cache storage/logs \
+    && mkdir -p storage storage/logs bootstrap/cache \
     && chown -R application:application storage bootstrap/cache \
-    && chmod -R 775 storage/bootstrap/cache
+    && chmod -R 775 storage bootstrap/cache
+
 COPY docker/entrypoint.sh /usr/local/bin/app-entry.sh
 RUN chmod +x /usr/local/bin/app-entry.sh
+
 ENTRYPOINT ["/usr/local/bin/app-entry.sh"]
