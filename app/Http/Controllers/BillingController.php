@@ -9,7 +9,32 @@ use Illuminate\Support\Facades\DB;
 
 class BillingController extends Controller
 {
-    // POST /api/billing/subscribe/personal
+    /**
+     * @OA\Post(
+     *     path="/api/billing/subscribe/personal",
+     *     tags={"Billing"},
+     *     summary="Subscribe to personal plan",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"plan"},
+     *             @OA\Property(property="plan", type="string", enum={"pro", "pro_plus"}, example="pro"),
+     *             @OA\Property(property="period_end", type="string", format="date", example="2024-12-31")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Subscription created successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="subscription", type="object"),
+     *             @OA\Property(property="is_plus", type="boolean")
+     *         )
+     *     ),
+     *     @OA\Response(response=401, description="Unauthenticated"),
+     *     @OA\Response(response=422, description="Validation error")
+     * )
+     */
     public function subscribePersonal(Request $req)
     {
         $data = $req->validate([
@@ -36,7 +61,33 @@ class BillingController extends Controller
         });
     }
 
-    // POST /api/billing/subscribe/company
+    /**
+     * @OA\Post(
+     *     path="/api/billing/subscribe/company",
+     *     tags={"Billing"},
+     *     summary="Subscribe to company plan",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"company_id", "plan"},
+     *             @OA\Property(property="company_id", type="integer", example=1),
+     *             @OA\Property(property="plan", type="string", enum={"pro", "pro_plus"}, example="pro_plus"),
+     *             @OA\Property(property="period_end", type="string", format="date", example="2024-12-31")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Company subscription created successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="subscription", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=401, description="Unauthenticated"),
+     *     @OA\Response(response=404, description="Company not found"),
+     *     @OA\Response(response=422, description="Validation error")
+     * )
+     */
     public function subscribeCompany(Request $req)
     {
         $data = $req->validate([

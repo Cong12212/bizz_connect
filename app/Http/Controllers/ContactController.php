@@ -16,15 +16,33 @@ use Carbon\Carbon;
 class ContactController extends Controller
 {
     /**
-     * GET /contacts
-     * Filters:
-     *  - q (+hashtags #vip)
-     *  - tag_ids, tags, tag_mode(any|all)
-     *  - without_tag (id or name)
-     *  - with_reminder / without_reminder (+status/after/before)
-     *  - exclude_ids
-     *  - sort: name|-name|id|-id (default -id)
-     *  - per_page <= 100
+     * @OA\Get(
+     *     path="/api/contacts",
+     *     tags={"Contacts"},
+     *     summary="Get contacts list with filters",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="q", in="query", description="Search term (supports #hashtags)", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="tag_ids", in="query", description="Filter by tag IDs (comma-separated)", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="tags", in="query", description="Filter by tag names (comma-separated)", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="tag_mode", in="query", description="Tag matching mode", @OA\Schema(type="string", enum={"any", "all"}, default="any")),
+     *     @OA\Parameter(name="without_tag", in="query", description="Exclude contacts with this tag (ID or name)", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="with_reminder", in="query", description="Filter contacts with reminders", @OA\Schema(type="boolean")),
+     *     @OA\Parameter(name="without_reminder", in="query", description="Filter contacts without reminders", @OA\Schema(type="boolean")),
+     *     @OA\Parameter(name="status", in="query", description="Reminder status filter", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="after", in="query", description="Reminder due after date", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="before", in="query", description="Reminder due before date", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="exclude_ids", in="query", description="Exclude contact IDs (comma-separated)", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="sort", in="query", description="Sort field", @OA\Schema(type="string", enum={"name", "-name", "id", "-id"}, default="-id")),
+     *     @OA\Parameter(name="per_page", in="query", description="Items per page (max 100)", @OA\Schema(type="integer", default=20)),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Paginated contacts list",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Contact")),
+     *             @OA\Property(property="meta", type="object")
+     *         )
+     *     )
+     * )
      */
     public function index(Request $r)
     {
@@ -160,7 +178,37 @@ class ContactController extends Controller
     }
 
     /**
-     * POST /contacts
+     * @OA\Post(
+     *     path="/api/contacts",
+     *     tags={"Contacts"},
+     *     summary="Create a new contact",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"name"},
+     *             @OA\Property(property="name", type="string", maxLength=255, example="John Doe"),
+     *             @OA\Property(property="company", type="string", maxLength=255, example="ABC Corp"),
+     *             @OA\Property(property="job_title", type="string", maxLength=255, example="CEO"),
+     *             @OA\Property(property="email", type="string", format="email", maxLength=255, example="john@example.com"),
+     *             @OA\Property(property="phone", type="string", maxLength=50, example="+1234567890"),
+     *             @OA\Property(property="address", type="string", maxLength=255, example="123 Main St"),
+     *             @OA\Property(property="notes", type="string", example="Important client"),
+     *             @OA\Property(property="linkedin_url", type="string", format="url", maxLength=255),
+     *             @OA\Property(property="website_url", type="string", format="url", maxLength=255),
+     *             @OA\Property(property="ocr_raw", type="string", description="Raw OCR text from business card"),
+     *             @OA\Property(property="duplicate_of_id", type="integer", description="ID of original contact if duplicate"),
+     *             @OA\Property(property="search_text", type="string", description="Additional searchable text"),
+     *             @OA\Property(property="source", type="string", maxLength=50, example="manual", description="Contact source")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Contact created successfully",
+     *         @OA\JsonContent(@OA\Property(property="data", ref="#/components/schemas/Contact"))
+     *     ),
+     *     @OA\Response(response=422, description="Validation error")
+     * )
      */
     public function store(Request $r)
     {
@@ -202,7 +250,20 @@ class ContactController extends Controller
     }
 
     /**
-     * GET /contacts/{contact}
+     * @OA\Get(
+     *     path="/api/contacts/{contact}",
+     *     tags={"Contacts"},
+     *     summary="Get a specific contact",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="contact", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Contact details",
+     *         @OA\JsonContent(@OA\Property(property="data", ref="#/components/schemas/Contact"))
+     *     ),
+     *     @OA\Response(response=403, description="Forbidden"),
+     *     @OA\Response(response=404, description="Contact not found")
+     * )
      */
     public function show(Request $r, Contact $contact)
     {
@@ -213,7 +274,34 @@ class ContactController extends Controller
     }
 
     /**
-     * PUT /contacts/{contact}
+     * @OA\Put(
+     *     path="/api/contacts/{contact}",
+     *     tags={"Contacts"},
+     *     summary="Update a contact",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="contact", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\RequestBody(
+     *         @OA\JsonContent(
+     *             @OA\Property(property="name", type="string", maxLength=255),
+     *             @OA\Property(property="company", type="string", maxLength=255),
+     *             @OA\Property(property="job_title", type="string", maxLength=255),
+     *             @OA\Property(property="email", type="string", format="email", maxLength=255),
+     *             @OA\Property(property="phone", type="string", maxLength=50),
+     *             @OA\Property(property="address", type="string", maxLength=255),
+     *             @OA\Property(property="notes", type="string"),
+     *             @OA\Property(property="linkedin_url", type="string", format="url", maxLength=255),
+     *             @OA\Property(property="website_url", type="string", format="url", maxLength=255),
+     *             @OA\Property(property="duplicate_of_id", type="integer"),
+     *             @OA\Property(property="source", type="string", maxLength=50)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Contact updated successfully",
+     *         @OA\JsonContent(@OA\Property(property="data", ref="#/components/schemas/Contact"))
+     *     ),
+     *     @OA\Response(response=422, description="Validation error or circular duplicate")
+     * )
      */
     public function update(Request $r, Contact $contact)
     {
@@ -257,7 +345,16 @@ class ContactController extends Controller
     }
 
     /**
-     * DELETE /contacts/{contact}
+     * @OA\Delete(
+     *     path="/api/contacts/{contact}",
+     *     tags={"Contacts"},
+     *     summary="Delete a contact",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="contact", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(response=204, description="Contact deleted successfully"),
+     *     @OA\Response(response=403, description="Forbidden"),
+     *     @OA\Response(response=404, description="Contact not found")
+     * )
      */
     public function destroy(Request $r, Contact $contact)
     {
@@ -267,7 +364,24 @@ class ContactController extends Controller
     }
 
     /**
-     * POST /contacts/{contact}/tags
+     * @OA\Post(
+     *     path="/api/contacts/{contact}/tags",
+     *     tags={"Contacts"},
+     *     summary="Attach tags to a contact",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="contact", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\RequestBody(
+     *         @OA\JsonContent(
+     *             @OA\Property(property="ids", type="array", @OA\Items(type="integer"), description="Tag IDs to attach"),
+     *             @OA\Property(property="names", type="array", @OA\Items(type="string"), description="Tag names to attach (will be created if not exist)")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Tags attached successfully",
+     *         @OA\JsonContent(ref="#/components/schemas/Contact")
+     *     )
+     * )
      */
     public function attachTags(Request $r, Contact $contact)
     {
@@ -309,7 +423,20 @@ class ContactController extends Controller
     }
 
     /**
-     * DELETE /contacts/{contact}/tags/{tag}
+     * @OA\Delete(
+     *     path="/api/contacts/{contact}/tags/{tag}",
+     *     tags={"Contacts"},
+     *     summary="Detach a tag from a contact",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="contact", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Parameter(name="tag", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Tag detached successfully",
+     *         @OA\JsonContent(ref="#/components/schemas/Contact")
+     *     ),
+     *     @OA\Response(response=403, description="Forbidden")
+     * )
      */
     public function detachTag(Request $r, Contact $contact, Tag $tag)
     {
@@ -345,7 +472,26 @@ class ContactController extends Controller
     }
 
     /**
-     * GET /contacts/export
+     * @OA\Get(
+     *     path="/api/contacts/export",
+     *     tags={"Contacts"},
+     *     summary="Export contacts to Excel/CSV",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="ids", in="query", description="Specific contact IDs to export (comma-separated)", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="q", in="query", description="Search term filter", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="tag_ids", in="query", description="Filter by tag IDs", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="tags", in="query", description="Filter by tag names", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="tag_mode", in="query", description="Tag matching mode", @OA\Schema(type="string", enum={"any", "all"})),
+     *     @OA\Parameter(name="without_tag", in="query", description="Exclude contacts with this tag", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="exclude_ids", in="query", description="Exclude contact IDs", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="format", in="query", description="Export format", @OA\Schema(type="string", enum={"xlsx", "csv"}, default="xlsx")),
+     *     @OA\Parameter(name="sort", in="query", description="Sort field", @OA\Schema(type="string", enum={"name", "-name", "id", "-id"})),
+     *     @OA\Response(
+     *         response=200,
+     *         description="File download",
+     *         @OA\MediaType(mediaType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+     *     )
+     * )
      */
     public function export(Request $r)
     {
@@ -484,7 +630,34 @@ class ContactController extends Controller
             : Excel::download($export, $file, \Maatwebsite\Excel\Excel::XLSX);
     }
 
-    /** POST /contacts/import … (giữ nguyên phần còn lại) */
+    /**
+     * @OA\Post(
+     *     path="/api/contacts/import",
+     *     tags={"Contacts"},
+     *     summary="Import contacts from Excel/CSV file",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\MediaType(
+     *             mediaType="multipart/form-data",
+     *             @OA\Schema(
+     *                 required={"file"},
+     *                 @OA\Property(property="file", type="string", format="binary", description="Excel or CSV file"),
+     *                 @OA\Property(property="match_by", type="string", enum={"id", "email", "phone"}, description="Field to match existing contacts")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Import completed",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="status", type="string", example="ok"),
+     *             @OA\Property(property="summary", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=422, description="Validation error")
+     * )
+     */
     public function import(Request $r)
     {
         $data = $r->validate([
@@ -503,6 +676,26 @@ class ContactController extends Controller
         ]);
     }
 
+    /**
+     * @OA\Post(
+     *     path="/api/contacts/bulk-delete",
+     *     tags={"Contacts"},
+     *     summary="Bulk delete contacts",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"ids"},
+     *             @OA\Property(property="ids", type="array", @OA\Items(type="integer"), description="Contact IDs to delete")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Contacts deleted successfully",
+     *         @OA\JsonContent(@OA\Property(property="deleted", type="integer", description="Number of contacts deleted"))
+     *     )
+     * )
+     */
     public function bulkDelete(Request $r)
     {
         $uid = $r->user()->id;

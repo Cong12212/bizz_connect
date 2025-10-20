@@ -1,47 +1,51 @@
 {
     "openapi": "3.0.0",
     "info": {
-        "title": "Biz-Connect API",
+        "title": "Bizz Connect API Documentation",
+        "description": "RESTful API for Bizz Connect - Contact & Business Management System",
+        "contact": {
+            "email": "support@bizzconnect.com"
+        },
         "version": "1.0.0"
     },
     "servers": [
         {
-            "url": "/api",
-            "description": "Laravel API base path"
+            "url": "http://my-default-host.com",
+            "description": "API Server"
         }
     ],
     "paths": {
-        "/auth/register": {
+        "/api/register": {
             "post": {
                 "tags": [
-                    "Auth"
+                    "Authentication"
                 ],
-                "summary": "Register and send verification email (returns token)",
-                "operationId": "ed42f392010c301892e640067141676e",
+                "summary": "Register a new user",
+                "operationId": "8a56853624e025573120a09a4c75d468",
                 "requestBody": {
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "required": [
+                                    "name",
                                     "email",
                                     "password"
                                 ],
                                 "properties": {
                                     "name": {
                                         "type": "string",
-                                        "maxLength": 100,
-                                        "example": "Nguyen Chi Cong"
+                                        "example": "John Doe"
                                     },
                                     "email": {
                                         "type": "string",
                                         "format": "email",
-                                        "example": "cong@example.com"
+                                        "example": "john@example.com"
                                     },
                                     "password": {
                                         "type": "string",
                                         "format": "password",
-                                        "example": "secret123"
+                                        "example": "password123"
                                     }
                                 },
                                 "type": "object"
@@ -51,21 +55,36 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Created"
-                    },
-                    "422": {
-                        "description": "Validation error"
+                        "description": "User registered successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "token": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "verified": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 }
             }
         },
-        "/auth/login": {
+        "/api/login": {
             "post": {
                 "tags": [
-                    "Auth"
+                    "Authentication"
                 ],
-                "summary": "Login with email/password",
-                "operationId": "8cb7742ae98d0990acb2907c4e00bf24",
+                "summary": "Login user",
+                "operationId": "a3b306d14572d1f4bd6c064b3233e7b8",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -76,6 +95,92 @@
                                     "password"
                                 ],
                                 "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "john@example.com"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "example": "password123"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Login successful",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "token": {
+                                            "type": "string"
+                                        },
+                                        "verified": {
+                                            "type": "boolean"
+                                        },
+                                        "user": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid credentials"
+                    }
+                }
+            }
+        },
+        "/api/me": {
+            "get": {
+                "tags": [
+                    "User"
+                ],
+                "summary": "Get current user",
+                "operationId": "9d9bc556f927575aa492a88c28fe5908",
+                "responses": {
+                    "200": {
+                        "description": "Current user data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/User"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "User"
+                ],
+                "summary": "Update current user",
+                "operationId": "5f1c364e899b18491e53b876670339b6",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
                                     "email": {
                                         "type": "string",
                                         "format": "email"
@@ -92,24 +197,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "OK"
-                    },
-                    "401": {
-                        "description": "Invalid credentials"
-                    }
-                }
-            }
-        },
-        "/auth/me": {
-            "get": {
-                "tags": [
-                    "Auth"
-                ],
-                "summary": "Get current user",
-                "operationId": "a9c495788506b114956e3f509e5d90a2",
-                "responses": {
-                    "200": {
-                        "description": "OK"
+                        "description": "User updated"
                     }
                 },
                 "security": [
@@ -119,16 +207,16 @@
                 ]
             }
         },
-        "/auth/logout": {
+        "/api/logout": {
             "post": {
                 "tags": [
-                    "Auth"
+                    "Authentication"
                 ],
-                "summary": "Logout",
-                "operationId": "0d29c740dc06d77602af8095bf4654cc",
+                "summary": "Logout user",
+                "operationId": "fe8f3429cd6979b3b4517e186505f9f9",
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "Logged out successfully"
                     }
                 },
                 "security": [
@@ -138,13 +226,32 @@
                 ]
             }
         },
-        "/email/verify/{id}/{hash}": {
+        "/api/email/resend": {
+            "post": {
+                "tags": [
+                    "Email Verification"
+                ],
+                "summary": "Resend verification email",
+                "operationId": "ef758aa84f7a4b60f0491e92f9ac64ec",
+                "responses": {
+                    "200": {
+                        "description": "Verification link sent"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/email/verify/{id}/{hash}": {
             "get": {
                 "tags": [
-                    "Auth"
+                    "Email Verification"
                 ],
-                "summary": "Verify email (signed URL, requires auth)",
-                "operationId": "51c8e326d5c0425a1f1d355474ec0188",
+                "summary": "Verify email address",
+                "operationId": "4af257178d5a9abf76c64c62e3a677cb",
                 "parameters": [
                     {
                         "name": "id",
@@ -161,112 +268,40 @@
                         "schema": {
                             "type": "string"
                         }
-                    },
-                    {
-                        "name": "expires",
-                        "in": "query",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "name": "signature",
-                        "in": "query",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "Verified"
-                    },
-                    "403": {
-                        "description": "Invalid or expired link"
+                    "302": {
+                        "description": "Redirect to frontend"
                     }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
+                }
             }
         },
-        "/email/verification-notification": {
+        "/api/password/request": {
             "post": {
                 "tags": [
-                    "Auth"
+                    "Password Reset"
                 ],
-                "summary": "Resend verification email",
-                "operationId": "614a1fcc43bcd8a91f6f00ce5a5b9420",
-                "responses": {
-                    "200": {
-                        "description": "Sent"
-                    },
-                    "429": {
-                        "description": "Too Many Requests"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/companies": {
-            "get": {
-                "tags": [
-                    "Companies"
-                ],
-                "summary": "List companies of current user",
-                "operationId": "8af1177352a157e9228c00f023616d87",
-                "parameters": [
-                    {
-                        "name": "page",
-                        "in": "query",
-                        "schema": {
-                            "type": "integer",
-                            "minimum": 1
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "post": {
-                "tags": [
-                    "Companies"
-                ],
-                "summary": "Create a company (current user becomes OWNER)",
-                "operationId": "dd2ae66c40ea62cd8f20d49bc08e4b21",
+                "summary": "Request password reset code",
+                "operationId": "7e30374a7b8b5cebad3c2f1ec7e4e509",
                 "requestBody": {
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "required": [
-                                    "name"
+                                    "email",
+                                    "new_password"
                                 ],
                                 "properties": {
-                                    "name": {
+                                    "email": {
                                         "type": "string",
-                                        "maxLength": 200
+                                        "format": "email"
                                     },
-                                    "address": {
+                                    "new_password": {
                                         "type": "string",
-                                        "maxLength": 255,
-                                        "nullable": true
+                                        "format": "password",
+                                        "minLength": 6
                                     }
                                 },
                                 "type": "object"
@@ -275,8 +310,139 @@
                     }
                 },
                 "responses": {
-                    "201": {
-                        "description": "Created"
+                    "200": {
+                        "description": "Code sent if email exists"
+                    }
+                }
+            }
+        },
+        "/api/password/resend": {
+            "post": {
+                "tags": [
+                    "Password Reset"
+                ],
+                "summary": "Resend password reset code",
+                "operationId": "0c0877d66bfda5fa43591e4df081c559",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Code re-sent"
+                    }
+                }
+            }
+        },
+        "/api/password/verify": {
+            "post": {
+                "tags": [
+                    "Password Reset"
+                ],
+                "summary": "Verify code and reset password",
+                "operationId": "ee4bf57badfe0c3fe627463d7b955a86",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email",
+                                    "code"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    },
+                                    "code": {
+                                        "type": "string",
+                                        "pattern": "^\\d{6}$"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Password reset successful"
+                    }
+                }
+            }
+        },
+        "/api/billing/subscribe/personal": {
+            "post": {
+                "tags": [
+                    "Billing"
+                ],
+                "summary": "Subscribe to personal plan",
+                "operationId": "535143e77f6841d88a254aab95ccacf6",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "plan"
+                                ],
+                                "properties": {
+                                    "plan": {
+                                        "type": "string",
+                                        "enum": [
+                                            "pro",
+                                            "pro_plus"
+                                        ],
+                                        "example": "pro"
+                                    },
+                                    "period_end": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2024-12-31"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Subscription created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "subscription": {
+                                            "type": "object"
+                                        },
+                                        "is_plus": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
                     },
                     "422": {
                         "description": "Validation error"
@@ -289,69 +455,39 @@
                 ]
             }
         },
-        "/companies/{company}": {
-            "get": {
+        "/api/billing/subscribe/company": {
+            "post": {
                 "tags": [
-                    "Companies"
+                    "Billing"
                 ],
-                "summary": "Get a company detail",
-                "operationId": "698a900dfd479af004615dda8237f2d1",
-                "parameters": [
-                    {
-                        "name": "company",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK"
-                    },
-                    "403": {
-                        "description": "No access"
-                    },
-                    "404": {
-                        "description": "Not found"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "put": {
-                "tags": [
-                    "Companies"
-                ],
-                "summary": "Update a company",
-                "operationId": "5c7281a657faa268f7179916363cd7c8",
-                "parameters": [
-                    {
-                        "name": "company",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
+                "summary": "Subscribe to company plan",
+                "operationId": "30b329b15e4bb04b2bcf5d6882a8efff",
                 "requestBody": {
+                    "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
+                                "required": [
+                                    "company_id",
+                                    "plan"
+                                ],
                                 "properties": {
-                                    "name": {
-                                        "type": "string",
-                                        "maxLength": 200
+                                    "company_id": {
+                                        "type": "integer",
+                                        "example": 1
                                     },
-                                    "address": {
+                                    "plan": {
                                         "type": "string",
-                                        "maxLength": 255,
-                                        "nullable": true
+                                        "enum": [
+                                            "pro",
+                                            "pro_plus"
+                                        ],
+                                        "example": "pro_plus"
+                                    },
+                                    "period_end": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2024-12-31"
                                     }
                                 },
                                 "type": "object"
@@ -361,47 +497,13 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "OK"
-                    },
-                    "403": {
-                        "description": "Insufficient role"
-                    },
-                    "404": {
-                        "description": "Not found"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "delete": {
-                "tags": [
-                    "Companies"
-                ],
-                "summary": "Delete a company",
-                "operationId": "1cf2d2ee9aab00344b6a01ad6febfcea",
-                "parameters": [
-                    {
-                        "name": "company",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
+                        "description": "Company subscription created successfully",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "properties": {
-                                        "deleted": {
-                                            "type": "boolean",
-                                            "example": true
+                                        "subscription": {
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
@@ -409,11 +511,14 @@
                             }
                         }
                     },
-                    "403": {
-                        "description": "Insufficient role"
+                    "401": {
+                        "description": "Unauthenticated"
                     },
                     "404": {
-                        "description": "Not found"
+                        "description": "Company not found"
+                    },
+                    "422": {
+                        "description": "Validation error"
                     }
                 },
                 "security": [
@@ -423,771 +528,137 @@
                 ]
             }
         },
-        "/companies/{company}/contacts": {
+        "/api/contacts": {
             "get": {
                 "tags": [
                     "Contacts"
                 ],
-                "summary": "List contacts in a company",
-                "operationId": "ce2f8cfa0cfacac44d74eeaeaaebac0c",
+                "summary": "Get contacts list with filters",
+                "operationId": "0f9efb5609dbb039b35ecafb28e492a2",
                 "parameters": [
-                    {
-                        "name": "company",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
                     {
                         "name": "q",
                         "in": "query",
-                        "description": "Search by name/email/company",
+                        "description": "Search term (supports #hashtags)",
                         "schema": {
                             "type": "string"
                         }
                     },
                     {
-                        "name": "tagId",
+                        "name": "tag_ids",
                         "in": "query",
-                        "description": "Filter by tag id",
+                        "description": "Filter by tag IDs (comma-separated)",
                         "schema": {
-                            "type": "integer"
+                            "type": "string"
                         }
                     },
                     {
-                        "name": "per_page",
+                        "name": "tags",
                         "in": "query",
+                        "description": "Filter by tag names (comma-separated)",
                         "schema": {
-                            "type": "integer",
-                            "default": 20,
-                            "maximum": 100,
-                            "minimum": 1
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "tag_mode",
+                        "in": "query",
+                        "description": "Tag matching mode",
+                        "schema": {
+                            "type": "string",
+                            "default": "any",
+                            "enum": [
+                                "any",
+                                "all"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "without_tag",
+                        "in": "query",
+                        "description": "Exclude contacts with this tag (ID or name)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "with_reminder",
+                        "in": "query",
+                        "description": "Filter contacts with reminders",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "without_reminder",
+                        "in": "query",
+                        "description": "Filter contacts without reminders",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Reminder status filter",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "after",
+                        "in": "query",
+                        "description": "Reminder due after date",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "before",
+                        "in": "query",
+                        "description": "Reminder due before date",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "exclude_ids",
+                        "in": "query",
+                        "description": "Exclude contact IDs (comma-separated)",
+                        "schema": {
+                            "type": "string"
                         }
                     },
                     {
                         "name": "sort",
                         "in": "query",
-                        "description": "Sort field (prefix '-' for desc). Ex: -id, name",
+                        "description": "Sort field",
                         "schema": {
                             "type": "string",
-                            "default": "-id"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "post": {
-                "tags": [
-                    "Contacts"
-                ],
-                "summary": "Create a contact in a company",
-                "operationId": "852e380c9a858bca6729073a15e4cae6",
-                "parameters": [
-                    {
-                        "name": "company",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "name"
-                                ],
-                                "properties": {
-                                    "name": {
-                                        "type": "string",
-                                        "maxLength": 200
-                                    },
-                                    "email": {
-                                        "type": "string",
-                                        "format": "email",
-                                        "nullable": true
-                                    },
-                                    "phone": {
-                                        "type": "string",
-                                        "maxLength": 50,
-                                        "nullable": true
-                                    },
-                                    "company": {
-                                        "type": "string",
-                                        "maxLength": 200,
-                                        "nullable": true
-                                    },
-                                    "address": {
-                                        "type": "string",
-                                        "maxLength": 255,
-                                        "nullable": true
-                                    },
-                                    "notes": {
-                                        "type": "string",
-                                        "nullable": true
-                                    },
-                                    "tag_ids": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer"
-                                        }
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Created"
-                    },
-                    "422": {
-                        "description": "Validation error"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/companies/{company}/contacts/{contact}": {
-            "get": {
-                "tags": [
-                    "Contacts"
-                ],
-                "summary": "Get a contact detail",
-                "operationId": "c15b92056a70f6c318e8452096e58b44",
-                "parameters": [
-                    {
-                        "name": "company",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
+                            "default": "-id",
+                            "enum": [
+                                "name",
+                                "-name",
+                                "id",
+                                "-id"
+                            ]
                         }
                     },
                     {
-                        "name": "contact",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK"
-                    },
-                    "404": {
-                        "description": "Not found"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "put": {
-                "tags": [
-                    "Contacts"
-                ],
-                "summary": "Update a contact",
-                "operationId": "553d9360ec4fed554b2e03c3d041bc70",
-                "parameters": [
-                    {
-                        "name": "company",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "name": "contact",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "properties": {
-                                    "name": {
-                                        "type": "string",
-                                        "maxLength": 200
-                                    },
-                                    "email": {
-                                        "type": "string",
-                                        "format": "email",
-                                        "nullable": true
-                                    },
-                                    "phone": {
-                                        "type": "string",
-                                        "maxLength": 50,
-                                        "nullable": true
-                                    },
-                                    "company": {
-                                        "type": "string",
-                                        "maxLength": 200,
-                                        "nullable": true
-                                    },
-                                    "address": {
-                                        "type": "string",
-                                        "maxLength": 255,
-                                        "nullable": true
-                                    },
-                                    "notes": {
-                                        "type": "string",
-                                        "nullable": true
-                                    },
-                                    "tag_ids": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer"
-                                        }
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "OK"
-                    },
-                    "404": {
-                        "description": "Not found"
-                    },
-                    "422": {
-                        "description": "Validation error"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "delete": {
-                "tags": [
-                    "Contacts"
-                ],
-                "summary": "Delete a contact",
-                "operationId": "4c960232c42230126b04e4a052365ebb",
-                "parameters": [
-                    {
-                        "name": "company",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "name": "contact",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "deleted": {
-                                            "type": "boolean",
-                                            "example": true
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not found"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/companies/{company}/members": {
-            "get": {
-                "tags": [
-                    "Memberships"
-                ],
-                "summary": "Danh sách thành viên của công ty",
-                "operationId": "34be69248a9032edc370c92222a10ecb",
-                "parameters": [
-                    {
-                        "name": "company",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "name": "page",
+                        "name": "per_page",
                         "in": "query",
+                        "description": "Items per page (max 100)",
                         "schema": {
                             "type": "integer",
-                            "minimum": 1
+                            "default": 20
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "post": {
-                "tags": [
-                    "Memberships"
-                ],
-                "summary": "Thêm user vào công ty",
-                "operationId": "a542ac323662a232acd51ef6a163e6b3",
-                "parameters": [
-                    {
-                        "name": "company",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "user_id",
-                                    "role"
-                                ],
-                                "properties": {
-                                    "user_id": {
-                                        "type": "integer",
-                                        "example": 12
-                                    },
-                                    "role": {
-                                        "type": "string",
-                                        "enum": [
-                                            "OWNER",
-                                            "ADMIN",
-                                            "MEMBER"
-                                        ],
-                                        "example": "MEMBER"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Created"
-                    },
-                    "403": {
-                        "description": "Insufficient role"
-                    },
-                    "409": {
-                        "description": "Already a member"
-                    },
-                    "422": {
-                        "description": "Validation error"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/companies/{company}/members/{user}": {
-            "delete": {
-                "tags": [
-                    "Memberships"
-                ],
-                "summary": "Xoá user khỏi công ty",
-                "operationId": "a68b0c1edc0f78dacbdc600c70f2582f",
-                "parameters": [
-                    {
-                        "name": "company",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "name": "user",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "deleted": {
-                                            "type": "boolean",
-                                            "example": true
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Can't remove yourself"
-                    },
-                    "403": {
-                        "description": "Insufficient role"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/contacts/{contact}/reminders": {
-            "get": {
-                "tags": [
-                    "Reminders"
-                ],
-                "summary": "List reminders of a contact (latest first)",
-                "operationId": "f8b54a2dc4d8032a4421dcb059df70ca",
-                "parameters": [
-                    {
-                        "name": "contact",
-                        "in": "path",
-                        "description": "Contact ID",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "name": "page",
-                        "in": "query",
-                        "schema": {
-                            "type": "integer",
-                            "minimum": 1
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "post": {
-                "tags": [
-                    "Reminders"
-                ],
-                "summary": "Create a reminder for a contact",
-                "operationId": "a7f1dd10e019a3670805e2ba8bb1595e",
-                "parameters": [
-                    {
-                        "name": "contact",
-                        "in": "path",
-                        "description": "Contact ID",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "date",
-                                    "time"
-                                ],
-                                "properties": {
-                                    "date": {
-                                        "type": "string",
-                                        "format": "date",
-                                        "example": "2025-09-10"
-                                    },
-                                    "time": {
-                                        "type": "string",
-                                        "example": "14:30:00"
-                                    },
-                                    "note": {
-                                        "type": "string",
-                                        "maxLength": 255,
-                                        "example": "Call back after meeting"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Created"
-                    },
-                    "422": {
-                        "description": "Validation error"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/contacts/{contact}/reminders/{reminder}": {
-            "get": {
-                "tags": [
-                    "Reminders"
-                ],
-                "summary": "Get a reminder",
-                "operationId": "0c5d3e93c29a726b41bdaae560f90261",
-                "parameters": [
-                    {
-                        "name": "contact",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "name": "reminder",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK"
-                    },
-                    "404": {
-                        "description": "Not found"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "put": {
-                "tags": [
-                    "Reminders"
-                ],
-                "summary": "Update a reminder",
-                "operationId": "91d04d8e5f8532aeb6736d2c27b060c1",
-                "parameters": [
-                    {
-                        "name": "contact",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "name": "reminder",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "properties": {
-                                    "date": {
-                                        "type": "string",
-                                        "format": "date",
-                                        "example": "2025-10-01"
-                                    },
-                                    "time": {
-                                        "type": "string",
-                                        "example": "09:00:00"
-                                    },
-                                    "note": {
-                                        "type": "string",
-                                        "maxLength": 255,
-                                        "example": "Reschedule"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "OK"
-                    },
-                    "404": {
-                        "description": "Not found"
-                    },
-                    "422": {
-                        "description": "Validation error"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "delete": {
-                "tags": [
-                    "Reminders"
-                ],
-                "summary": "Delete a reminder",
-                "operationId": "48896e2cac2e99bf09999c1bb145cb52",
-                "parameters": [
-                    {
-                        "name": "contact",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "name": "reminder",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "deleted": {
-                                            "type": "boolean",
-                                            "example": true
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not found"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/tags": {
-            "get": {
-                "tags": [
-                    "Tags"
-                ],
-                "summary": "List tags (paginated)",
-                "operationId": "8767fe41ed2e75df7ce6f99c8aeb47cb",
-                "parameters": [
-                    {
-                        "name": "q",
-                        "in": "query",
-                        "description": "Search by name",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "page",
-                        "in": "query",
-                        "description": "Page number",
-                        "schema": {
-                            "type": "integer",
-                            "minimum": 1
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
+                        "description": "Paginated contacts list",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1195,29 +666,8 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "name": {
-                                                        "type": "string",
-                                                        "example": "VIP"
-                                                    },
-                                                    "created_at": {
-                                                        "type": "string",
-                                                        "format": "date-time"
-                                                    },
-                                                    "updated_at": {
-                                                        "type": "string",
-                                                        "format": "date-time"
-                                                    }
-                                                },
-                                                "type": "object"
+                                                "$ref": "#/components/schemas/Contact"
                                             }
-                                        },
-                                        "links": {
-                                            "type": "object"
                                         },
                                         "meta": {
                                             "type": "object"
@@ -1237,10 +687,10 @@
             },
             "post": {
                 "tags": [
-                    "Tags"
+                    "Contacts"
                 ],
-                "summary": "Create a tag",
-                "operationId": "386137f14d37c8d53bcb5869d04e5595",
+                "summary": "Create a new contact",
+                "operationId": "a3b0baf957a16c1ed505f2e8985c254c",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -1252,8 +702,66 @@
                                 "properties": {
                                     "name": {
                                         "type": "string",
-                                        "maxLength": 100,
-                                        "example": "Priority"
+                                        "maxLength": 255,
+                                        "example": "John Doe"
+                                    },
+                                    "company": {
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "ABC Corp"
+                                    },
+                                    "job_title": {
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "CEO"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "maxLength": 255,
+                                        "example": "john@example.com"
+                                    },
+                                    "phone": {
+                                        "type": "string",
+                                        "maxLength": 50,
+                                        "example": "+1234567890"
+                                    },
+                                    "address": {
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "123 Main St"
+                                    },
+                                    "notes": {
+                                        "type": "string",
+                                        "example": "Important client"
+                                    },
+                                    "linkedin_url": {
+                                        "type": "string",
+                                        "format": "url",
+                                        "maxLength": 255
+                                    },
+                                    "website_url": {
+                                        "type": "string",
+                                        "format": "url",
+                                        "maxLength": 255
+                                    },
+                                    "ocr_raw": {
+                                        "description": "Raw OCR text from business card",
+                                        "type": "string"
+                                    },
+                                    "duplicate_of_id": {
+                                        "description": "ID of original contact if duplicate",
+                                        "type": "integer"
+                                    },
+                                    "search_text": {
+                                        "description": "Additional searchable text",
+                                        "type": "string"
+                                    },
+                                    "source": {
+                                        "description": "Contact source",
+                                        "type": "string",
+                                        "maxLength": 50,
+                                        "example": "manual"
                                     }
                                 },
                                 "type": "object"
@@ -1263,26 +771,13 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Created",
+                        "description": "Contact created successfully",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "properties": {
-                                        "id": {
-                                            "type": "integer",
-                                            "example": 3
-                                        },
-                                        "name": {
-                                            "type": "string",
-                                            "example": "Priority"
-                                        },
-                                        "created_at": {
-                                            "type": "string",
-                                            "format": "date-time"
-                                        },
-                                        "updated_at": {
-                                            "type": "string",
-                                            "format": "date-time"
+                                        "data": {
+                                            "$ref": "#/components/schemas/Contact"
                                         }
                                     },
                                     "type": "object"
@@ -1301,18 +796,1785 @@
                 ]
             }
         },
-        "/tags/{tag}": {
+        "/api/contacts/{contact}": {
+            "get": {
+                "tags": [
+                    "Contacts"
+                ],
+                "summary": "Get a specific contact",
+                "operationId": "1a9a36d323d70f1d5d15a163b14bb811",
+                "parameters": [
+                    {
+                        "name": "contact",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Contact details",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Contact"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "description": "Contact not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Contacts"
+                ],
+                "summary": "Update a contact",
+                "operationId": "e1c8ae746be20a66f17d489d3cf0d86c",
+                "parameters": [
+                    {
+                        "name": "contact",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    },
+                                    "company": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    },
+                                    "job_title": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "maxLength": 255
+                                    },
+                                    "phone": {
+                                        "type": "string",
+                                        "maxLength": 50
+                                    },
+                                    "address": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    },
+                                    "notes": {
+                                        "type": "string"
+                                    },
+                                    "linkedin_url": {
+                                        "type": "string",
+                                        "format": "url",
+                                        "maxLength": 255
+                                    },
+                                    "website_url": {
+                                        "type": "string",
+                                        "format": "url",
+                                        "maxLength": 255
+                                    },
+                                    "duplicate_of_id": {
+                                        "type": "integer"
+                                    },
+                                    "source": {
+                                        "type": "string",
+                                        "maxLength": 50
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Contact updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Contact"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error or circular duplicate"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Contacts"
+                ],
+                "summary": "Delete a contact",
+                "operationId": "d98daa627c7df51be8d4689b627532ab",
+                "parameters": [
+                    {
+                        "name": "contact",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Contact deleted successfully"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "description": "Contact not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/contacts/{contact}/tags": {
+            "post": {
+                "tags": [
+                    "Contacts"
+                ],
+                "summary": "Attach tags to a contact",
+                "operationId": "13bab1eadce168fa9cc58bbc5b6926d6",
+                "parameters": [
+                    {
+                        "name": "contact",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "ids": {
+                                        "description": "Tag IDs to attach",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "names": {
+                                        "description": "Tag names to attach (will be created if not exist)",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Tags attached successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Contact"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/contacts/{contact}/tags/{tag}": {
+            "delete": {
+                "tags": [
+                    "Contacts"
+                ],
+                "summary": "Detach a tag from a contact",
+                "operationId": "6543c11a69be3ff73f9c8fd26c3e6486",
+                "parameters": [
+                    {
+                        "name": "contact",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "tag",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tag detached successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Contact"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/contacts/export": {
+            "get": {
+                "tags": [
+                    "Contacts"
+                ],
+                "summary": "Export contacts to Excel/CSV",
+                "operationId": "fbf9f6a480f6596d596037a41fb13dc8",
+                "parameters": [
+                    {
+                        "name": "ids",
+                        "in": "query",
+                        "description": "Specific contact IDs to export (comma-separated)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "description": "Search term filter",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "tag_ids",
+                        "in": "query",
+                        "description": "Filter by tag IDs",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "tags",
+                        "in": "query",
+                        "description": "Filter by tag names",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "tag_mode",
+                        "in": "query",
+                        "description": "Tag matching mode",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "any",
+                                "all"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "without_tag",
+                        "in": "query",
+                        "description": "Exclude contacts with this tag",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "exclude_ids",
+                        "in": "query",
+                        "description": "Exclude contact IDs",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "format",
+                        "in": "query",
+                        "description": "Export format",
+                        "schema": {
+                            "type": "string",
+                            "default": "xlsx",
+                            "enum": [
+                                "xlsx",
+                                "csv"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "sort",
+                        "in": "query",
+                        "description": "Sort field",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "name",
+                                "-name",
+                                "id",
+                                "-id"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "File download",
+                        "content": {
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/contacts/import": {
+            "post": {
+                "tags": [
+                    "Contacts"
+                ],
+                "summary": "Import contacts from Excel/CSV file",
+                "operationId": "598002dfb387dabff0719109c82d3b17",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "required": [
+                                    "file"
+                                ],
+                                "properties": {
+                                    "file": {
+                                        "description": "Excel or CSV file",
+                                        "type": "string",
+                                        "format": "binary"
+                                    },
+                                    "match_by": {
+                                        "description": "Field to match existing contacts",
+                                        "type": "string",
+                                        "enum": [
+                                            "id",
+                                            "email",
+                                            "phone"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Import completed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "ok"
+                                        },
+                                        "summary": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/contacts/bulk-delete": {
+            "post": {
+                "tags": [
+                    "Contacts"
+                ],
+                "summary": "Bulk delete contacts",
+                "operationId": "273b69f590377f9c8e8a83d66d84d36b",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "ids"
+                                ],
+                                "properties": {
+                                    "ids": {
+                                        "description": "Contact IDs to delete",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Contacts deleted successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "deleted": {
+                                            "description": "Number of contacts deleted",
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/contacts/{contact}/tags/attach": {
+            "post": {
+                "tags": [
+                    "Contact Tags"
+                ],
+                "summary": "Attach tags to a contact",
+                "operationId": "9d83b9cd6cede439d5671f230b3086a7",
+                "parameters": [
+                    {
+                        "name": "contact",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "ids": {
+                                        "description": "Existing tag IDs to attach",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "names": {
+                                        "description": "Tag names to create and attach",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "maxLength": 100
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Tags attached successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Contact"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - Not contact owner"
+                    },
+                    "404": {
+                        "description": "Contact not found"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/contacts/{contact}/tags/{tag}/detach": {
+            "delete": {
+                "tags": [
+                    "Contact Tags"
+                ],
+                "summary": "Detach a tag from a contact",
+                "operationId": "dd3c52afabbddc1211e746f86b786361",
+                "parameters": [
+                    {
+                        "name": "contact",
+                        "in": "path",
+                        "description": "Contact ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "tag",
+                        "in": "path",
+                        "description": "Tag ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tag detached successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Contact"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - Not contact owner"
+                    },
+                    "404": {
+                        "description": "Contact or tag not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/notifications": {
+            "get": {
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Get user notifications with filters",
+                "operationId": "911565ad9aff9ba7eded3f189509e578",
+                "parameters": [
+                    {
+                        "name": "scope",
+                        "in": "query",
+                        "description": "Filter scope",
+                        "schema": {
+                            "type": "string",
+                            "default": "all",
+                            "enum": [
+                                "all",
+                                "unread",
+                                "upcoming",
+                                "past"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "description": "Maximum number of results (max 20)",
+                        "schema": {
+                            "type": "integer",
+                            "default": 20,
+                            "maximum": 20
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of notifications",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/UserNotification"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/notifications/{id}/read": {
+            "post": {
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Mark notification as read",
+                "operationId": "d3c26645cf40210e054d72089f8097a5",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Notification marked as read",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserNotification"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - Not notification owner"
+                    },
+                    "404": {
+                        "description": "Notification not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/notifications/{id}/done": {
+            "post": {
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Mark notification as done",
+                "operationId": "bd017904c30d894edad2eec2809e05b3",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Notification marked as done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserNotification"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - Not notification owner"
+                    },
+                    "404": {
+                        "description": "Notification not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/notifications/bulk-read": {
+            "post": {
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Bulk mark notifications as read",
+                "operationId": "e99069977dc1b7fb2597dabde3a9a98e",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "ids"
+                                ],
+                                "properties": {
+                                    "ids": {
+                                        "description": "Array of notification IDs to mark as read",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Notifications marked as read",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "updated": {
+                                            "description": "Number of notifications updated",
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/notifications/{id}": {
+            "delete": {
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Delete a notification",
+                "operationId": "54c4eb5ec5dc0d1e2916cec2fced1056",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Notification deleted successfully"
+                    },
+                    "403": {
+                        "description": "Forbidden - Not notification owner"
+                    },
+                    "404": {
+                        "description": "Notification not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/reminders": {
+            "get": {
+                "tags": [
+                    "Reminders"
+                ],
+                "summary": "Get reminders list with filters",
+                "operationId": "8cbb20c8f9585000c503c8bebec7bc13",
+                "parameters": [
+                    {
+                        "name": "contact_id",
+                        "in": "query",
+                        "description": "Filter by contact ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter by status",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "pending",
+                                "done",
+                                "skipped",
+                                "cancelled"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "before",
+                        "in": "query",
+                        "description": "Due before date",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "after",
+                        "in": "query",
+                        "description": "Due after date",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "overdue",
+                        "in": "query",
+                        "description": "Show only overdue reminders",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "with_contacts",
+                        "in": "query",
+                        "description": "Include contacts relation",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Items per page (max 100)",
+                        "schema": {
+                            "type": "string",
+                            "default": "20"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated reminders list",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Reminder"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Reminders"
+                ],
+                "summary": "Create a new reminder",
+                "operationId": "b9c81f589753391f6c67354e108f482d",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "title",
+                                    "due_at"
+                                ],
+                                "properties": {
+                                    "title": {
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "Follow up meeting"
+                                    },
+                                    "note": {
+                                        "type": "string",
+                                        "example": "Discuss Q4 plans"
+                                    },
+                                    "due_at": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "example": "2024-12-31T10:00:00Z"
+                                    },
+                                    "status": {
+                                        "type": "string",
+                                        "default": "pending",
+                                        "enum": [
+                                            "pending",
+                                            "done",
+                                            "skipped",
+                                            "cancelled"
+                                        ]
+                                    },
+                                    "channel": {
+                                        "type": "string",
+                                        "default": "app",
+                                        "enum": [
+                                            "app",
+                                            "email",
+                                            "calendar"
+                                        ]
+                                    },
+                                    "contact_id": {
+                                        "description": "Primary contact ID",
+                                        "type": "integer"
+                                    },
+                                    "contact_ids": {
+                                        "description": "Array of contact IDs",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Reminder created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Reminder"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/reminders/{reminder}": {
+            "get": {
+                "tags": [
+                    "Reminders"
+                ],
+                "summary": "Get a specific reminder",
+                "operationId": "44b709a34a2ad29fb64b0d50df74db60",
+                "parameters": [
+                    {
+                        "name": "reminder",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reminder details",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Reminder"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "description": "Reminder not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Reminders"
+                ],
+                "summary": "Update a reminder",
+                "operationId": "390fdf944d7530167d4e3a4edb7607e6",
+                "parameters": [
+                    {
+                        "name": "reminder",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "title": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    },
+                                    "note": {
+                                        "type": "string"
+                                    },
+                                    "due_at": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                    },
+                                    "status": {
+                                        "type": "string",
+                                        "enum": [
+                                            "pending",
+                                            "done",
+                                            "skipped",
+                                            "cancelled"
+                                        ]
+                                    },
+                                    "channel": {
+                                        "type": "string",
+                                        "enum": [
+                                            "app",
+                                            "email",
+                                            "calendar"
+                                        ]
+                                    },
+                                    "contact_id": {
+                                        "type": "integer"
+                                    },
+                                    "contact_ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Reminder updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Reminder"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Reminders"
+                ],
+                "summary": "Delete a reminder",
+                "operationId": "e825f297d64550e7da2679ad08723252",
+                "parameters": [
+                    {
+                        "name": "reminder",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Reminder deleted successfully"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/reminders/{reminder}/done": {
+            "post": {
+                "tags": [
+                    "Reminders"
+                ],
+                "summary": "Mark reminder as done",
+                "operationId": "905d76b7a2cf1f1efc2cd93b397b1ee1",
+                "parameters": [
+                    {
+                        "name": "reminder",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reminder marked as done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Reminder"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/reminders/bulk-status": {
+            "post": {
+                "tags": [
+                    "Reminders"
+                ],
+                "summary": "Bulk update reminder status",
+                "operationId": "6be762782a4a878ad5660a3018143ee6",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "ids",
+                                    "status"
+                                ],
+                                "properties": {
+                                    "ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "status": {
+                                        "type": "string",
+                                        "enum": [
+                                            "pending",
+                                            "done",
+                                            "skipped",
+                                            "cancelled"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Status updated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "updated": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/reminders/bulk-delete": {
+            "post": {
+                "tags": [
+                    "Reminders"
+                ],
+                "summary": "Bulk delete reminders",
+                "operationId": "8a41e637e3923cd860385f43e71d0fb9",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "ids"
+                                ],
+                                "properties": {
+                                    "ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Reminders deleted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "deleted": {
+                                            "type": "integer"
+                                        },
+                                        "found": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "integer"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/reminders/{reminder}/contacts": {
+            "post": {
+                "tags": [
+                    "Reminders"
+                ],
+                "summary": "Attach contacts to a reminder",
+                "operationId": "cbc0ddbe7d8a28ff9bdb3f7aa6f46df4",
+                "parameters": [
+                    {
+                        "name": "reminder",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "ids"
+                                ],
+                                "properties": {
+                                    "ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "set_primary": {
+                                        "description": "Set first contact as primary",
+                                        "type": "boolean"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Contacts attached",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Reminder"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/reminders/{reminder}/contacts/{contact}": {
+            "delete": {
+                "tags": [
+                    "Reminders"
+                ],
+                "summary": "Detach a contact from a reminder",
+                "operationId": "4ed6d53854ded5f66534992ebcc652c0",
+                "parameters": [
+                    {
+                        "name": "reminder",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "contact",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Contact detached",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "ok": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/contacts/{contact}/reminders": {
+            "get": {
+                "tags": [
+                    "Reminders"
+                ],
+                "summary": "Get reminders for a specific contact",
+                "operationId": "c3c1e627a26d36d0e3da5ee7e8fd634e",
+                "parameters": [
+                    {
+                        "name": "contact",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "default": "50"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated reminders for contact",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Reminder"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/reminders/pivot": {
+            "get": {
+                "tags": [
+                    "Reminders"
+                ],
+                "summary": "Get reminder-contact pivot data with filters",
+                "operationId": "35bd0456aec2d2f555429fa0f9bc99d5",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "contact_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "after",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "before",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "overdue",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "default": "20"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pivot data with pagination",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        },
+                                        "per_page": {
+                                            "type": "integer"
+                                        },
+                                        "current_page": {
+                                            "type": "integer"
+                                        },
+                                        "last_page": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tags": {
+            "get": {
+                "tags": [
+                    "Tags"
+                ],
+                "summary": "Get tags list with filters",
+                "operationId": "4d0f4baf9e6fa992c0d85fbf140ebf17",
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "description": "Search term (supports # prefix)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Items per page (max 100)",
+                        "schema": {
+                            "type": "integer",
+                            "default": 100,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "sort",
+                        "in": "query",
+                        "description": "Sort field and direction",
+                        "schema": {
+                            "type": "string",
+                            "default": "name",
+                            "enum": [
+                                "name",
+                                "-name",
+                                "count",
+                                "-count"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated tags list with contact count",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Tag"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Tags"
+                ],
+                "summary": "Create a new tag",
+                "operationId": "a0a246f29dcb119a2189fd230fc10028",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 100,
+                                        "example": "#VIP"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Tag created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Tag"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error or duplicate tag name"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tags/{tag}": {
             "put": {
                 "tags": [
                     "Tags"
                 ],
                 "summary": "Update a tag",
-                "operationId": "a723574c30a5a91a42620b4a235d8bb7",
+                "operationId": "41b49eb4f2a830e150f50252f4d831b8",
                 "parameters": [
                     {
                         "name": "tag",
                         "in": "path",
-                        "description": "Tag ID",
                         "required": true,
                         "schema": {
                             "type": "integer"
@@ -1331,7 +2593,7 @@
                                     "name": {
                                         "type": "string",
                                         "maxLength": 100,
-                                        "example": "VIP"
+                                        "example": "Important"
                                     }
                                 },
                                 "type": "object"
@@ -1341,13 +2603,20 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "Tag updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Tag"
+                                }
+                            }
+                        }
                     },
-                    "404": {
-                        "description": "Not found"
+                    "403": {
+                        "description": "Forbidden - Not tag owner"
                     },
                     "422": {
-                        "description": "Validation error"
+                        "description": "Validation error or duplicate tag name"
                     }
                 },
                 "security": [
@@ -1361,12 +2630,11 @@
                     "Tags"
                 ],
                 "summary": "Delete a tag",
-                "operationId": "4e44d03f49955c0098148edb71bdf546",
+                "operationId": "383a246a07edec1e79fc652a61402685",
                 "parameters": [
                     {
                         "name": "tag",
                         "in": "path",
-                        "description": "Tag ID",
                         "required": true,
                         "schema": {
                             "type": "integer"
@@ -1374,280 +2642,14 @@
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "deleted": {
-                                            "type": "boolean",
-                                            "example": true
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                    "204": {
+                        "description": "Tag deleted successfully"
+                    },
+                    "403": {
+                        "description": "Forbidden - Not tag owner"
                     },
                     "404": {
-                        "description": "Not found"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/me/contacts": {
-            "get": {
-                "tags": [
-                    "Contacts (Personal)"
-                ],
-                "summary": "List my personal contacts",
-                "operationId": "3048955144a6bb46b4bb8015830f059d",
-                "parameters": [
-                    {
-                        "name": "q",
-                        "in": "query",
-                        "description": "Search name/email/company",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "tagId",
-                        "in": "query",
-                        "description": "Filter by tag id",
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "name": "per_page",
-                        "in": "query",
-                        "schema": {
-                            "type": "integer",
-                            "default": 20,
-                            "maximum": 100,
-                            "minimum": 1
-                        }
-                    },
-                    {
-                        "name": "sort",
-                        "in": "query",
-                        "description": "Sort field, prefix '-' for desc. Ex: -id, name",
-                        "schema": {
-                            "type": "string",
-                            "default": "-id"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "post": {
-                "tags": [
-                    "Contacts (Personal)"
-                ],
-                "summary": "Create a personal contact",
-                "operationId": "f9d61340be9b8e30a9aed72a006a1dc6",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "name"
-                                ],
-                                "properties": {
-                                    "name": {
-                                        "type": "string",
-                                        "maxLength": 200
-                                    },
-                                    "email": {
-                                        "type": "string",
-                                        "format": "email",
-                                        "nullable": true
-                                    },
-                                    "phone": {
-                                        "type": "string",
-                                        "maxLength": 50,
-                                        "nullable": true
-                                    },
-                                    "company": {
-                                        "type": "string",
-                                        "maxLength": 200,
-                                        "nullable": true
-                                    },
-                                    "address": {
-                                        "type": "string",
-                                        "maxLength": 255,
-                                        "nullable": true
-                                    },
-                                    "notes": {
-                                        "type": "string",
-                                        "nullable": true
-                                    },
-                                    "tag_ids": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer"
-                                        }
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Created"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/me/contacts/{contact}": {
-            "get": {
-                "tags": [
-                    "Contacts (Personal)"
-                ],
-                "summary": "Get my personal contact detail",
-                "operationId": "553ad962b2506f71249a63b7b8c98070",
-                "parameters": [
-                    {
-                        "name": "contact",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK"
-                    },
-                    "404": {
-                        "description": "Not found"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "put": {
-                "tags": [
-                    "Contacts (Personal)"
-                ],
-                "summary": "Update my personal contact",
-                "operationId": "8a5680b8a4d1b23f2327faf437092f4e",
-                "parameters": [
-                    {
-                        "name": "contact",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "properties": {
-                                    "name": {
-                                        "type": "string",
-                                        "maxLength": 200
-                                    },
-                                    "email": {
-                                        "type": "string",
-                                        "format": "email",
-                                        "nullable": true
-                                    },
-                                    "phone": {
-                                        "type": "string",
-                                        "maxLength": 50,
-                                        "nullable": true
-                                    },
-                                    "company": {
-                                        "type": "string",
-                                        "maxLength": 200,
-                                        "nullable": true
-                                    },
-                                    "address": {
-                                        "type": "string",
-                                        "maxLength": 255,
-                                        "nullable": true
-                                    },
-                                    "notes": {
-                                        "type": "string",
-                                        "nullable": true
-                                    },
-                                    "tag_ids": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer"
-                                        }
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "OK"
-                    },
-                    "404": {
-                        "description": "Not found"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "delete": {
-                "tags": [
-                    "Contacts (Personal)"
-                ],
-                "summary": "Delete my personal contact",
-                "operationId": "e6f21a5788f9ce2a518f60ec6fd4fe74",
-                "parameters": [
-                    {
-                        "name": "contact",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK"
+                        "description": "Tag not found"
                     }
                 },
                 "security": [
@@ -1659,42 +2661,248 @@
         }
     },
     "components": {
+        "schemas": {
+            "Contact": {
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "company": {
+                        "type": "string"
+                    },
+                    "job_title": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string"
+                    },
+                    "phone": {
+                        "type": "string"
+                    },
+                    "address": {
+                        "type": "string"
+                    },
+                    "notes": {
+                        "type": "string"
+                    },
+                    "linkedin_url": {
+                        "type": "string"
+                    },
+                    "website_url": {
+                        "type": "string"
+                    },
+                    "owner_user_id": {
+                        "type": "integer"
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Tag"
+                        }
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "Tag": {
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "owner_user_id": {
+                        "type": "integer"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "User": {
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string"
+                    },
+                    "email_verified_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "Reminder": {
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "note": {
+                        "type": "string"
+                    },
+                    "due_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "pending",
+                            "done",
+                            "skipped",
+                            "cancelled"
+                        ]
+                    },
+                    "channel": {
+                        "type": "string",
+                        "enum": [
+                            "app",
+                            "email",
+                            "calendar"
+                        ]
+                    },
+                    "contact_id": {
+                        "type": "integer"
+                    },
+                    "owner_user_id": {
+                        "type": "integer"
+                    },
+                    "contacts": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Contact"
+                        }
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "UserNotification": {
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "type": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "body": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "unread",
+                            "read",
+                            "done"
+                        ]
+                    },
+                    "scheduled_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "read_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "owner_user_id": {
+                        "type": "integer"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            }
+        },
         "securitySchemes": {
             "bearerAuth": {
                 "type": "http",
-                "bearerFormat": "JWT",
+                "description": "Enter your Bearer token in the format: Bearer {token}",
+                "bearerFormat": "Sanctum",
                 "scheme": "bearer"
             }
         }
     },
     "tags": [
         {
-            "name": "Auth",
-            "description": "Authentication & email verification"
+            "name": "Authentication",
+            "description": "Authentication"
         },
         {
-            "name": "Companies",
-            "description": "Manage companies of current user"
+            "name": "User",
+            "description": "User"
+        },
+        {
+            "name": "Email Verification",
+            "description": "Email Verification"
+        },
+        {
+            "name": "Password Reset",
+            "description": "Password Reset"
+        },
+        {
+            "name": "Billing",
+            "description": "Billing"
         },
         {
             "name": "Contacts",
-            "description": "Manage contacts under a company"
+            "description": "Contacts"
         },
         {
-            "name": "Memberships",
-            "description": "Quản lý thành viên trong công ty"
+            "name": "Contact Tags",
+            "description": "Contact Tags"
+        },
+        {
+            "name": "Notifications",
+            "description": "Notifications"
         },
         {
             "name": "Reminders",
-            "description": "Follow-up reminders for a contact"
+            "description": "Reminders"
         },
         {
             "name": "Tags",
-            "description": "Manage global tags"
-        },
-        {
-            "name": "Contacts (Personal)",
-            "description": "Manage personal contacts (no company)"
+            "description": "Tags"
         }
     ]
 }

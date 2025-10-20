@@ -25,6 +25,29 @@ class ReminderController extends Controller
     }
 
     /** List + filter (supports filtering by contact via contact_id OR pivot) */
+    /**
+     * @OA\Get(
+     *     path="/api/reminders",
+     *     tags={"Reminders"},
+     *     summary="Get reminders list with filters",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="contact_id", in="query", description="Filter by contact ID", @OA\Schema(type="integer")),
+     *     @OA\Parameter(name="status", in="query", description="Filter by status", @OA\Schema(type="string", enum={"pending", "done", "skipped", "cancelled"})),
+     *     @OA\Parameter(name="before", in="query", description="Due before date", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="after", in="query", description="Due after date", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="overdue", in="query", description="Show only overdue reminders", @OA\Schema(type="boolean")),
+     *     @OA\Parameter(name="with_contacts", in="query", description="Include contacts relation", @OA\Schema(type="boolean")),
+     *     @OA\Parameter(name="per_page", in="query", description="Items per page (max 100)", @OA\Schema(type="string", default="20")),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Paginated reminders list",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Reminder")),
+     *             @OA\Property(property="meta", type="object")
+     *         )
+     *     )
+     * )
+     */
     public function index(Request $r)
     {
         $uid = $r->user()->id;
@@ -51,6 +74,22 @@ class ReminderController extends Controller
         return $q->orderBy('due_at')->paginate($per);
     }
 
+    /**
+     * @OA\Get(
+     *     path="/api/reminders/{reminder}",
+     *     tags={"Reminders"},
+     *     summary="Get a specific reminder",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="reminder", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Reminder details",
+     *         @OA\JsonContent(ref="#/components/schemas/Reminder")
+     *     ),
+     *     @OA\Response(response=403, description="Forbidden"),
+     *     @OA\Response(response=404, description="Reminder not found")
+     * )
+     */
     public function show(Request $r, Reminder $reminder)
     {
         abort_unless($reminder->owner_user_id === $r->user()->id, 403);
@@ -58,6 +97,33 @@ class ReminderController extends Controller
     }
 
     /** CREATE: accepts contact_ids[] (or contact_id) -> set primary + sync pivot */
+    /**
+     * @OA\Post(
+     *     path="/api/reminders",
+     *     tags={"Reminders"},
+     *     summary="Create a new reminder",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"title", "due_at"},
+     *             @OA\Property(property="title", type="string", maxLength=255, example="Follow up meeting"),
+     *             @OA\Property(property="note", type="string", example="Discuss Q4 plans"),
+     *             @OA\Property(property="due_at", type="string", format="date-time", example="2024-12-31T10:00:00Z"),
+     *             @OA\Property(property="status", type="string", enum={"pending", "done", "skipped", "cancelled"}, default="pending"),
+     *             @OA\Property(property="channel", type="string", enum={"app", "email", "calendar"}, default="app"),
+     *             @OA\Property(property="contact_id", type="integer", description="Primary contact ID"),
+     *             @OA\Property(property="contact_ids", type="array", @OA\Items(type="integer"), description="Array of contact IDs")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Reminder created successfully",
+     *         @OA\JsonContent(ref="#/components/schemas/Reminder")
+     *     ),
+     *     @OA\Response(response=422, description="Validation error")
+     * )
+     */
     public function store(Request $r)
     {
         $uid  = $r->user()->id;
@@ -114,6 +180,31 @@ class ReminderController extends Controller
     }
 
     /** UPDATE: allows replacing entire contacts list (pivot) + change primary */
+    /**
+     * @OA\Put(
+     *     path="/api/reminders/{reminder}",
+     *     tags={"Reminders"},
+     *     summary="Update a reminder",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="reminder", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\RequestBody(
+     *         @OA\JsonContent(
+     *             @OA\Property(property="title", type="string", maxLength=255),
+     *             @OA\Property(property="note", type="string"),
+     *             @OA\Property(property="due_at", type="string", format="date-time"),
+     *             @OA\Property(property="status", type="string", enum={"pending", "done", "skipped", "cancelled"}),
+     *             @OA\Property(property="channel", type="string", enum={"app", "email", "calendar"}),
+     *             @OA\Property(property="contact_id", type="integer"),
+     *             @OA\Property(property="contact_ids", type="array", @OA\Items(type="integer"))
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Reminder updated successfully",
+     *         @OA\JsonContent(ref="#/components/schemas/Reminder")
+     *     )
+     * )
+     */
     public function update(Request $r, Reminder $reminder)
     {
         abort_unless($reminder->owner_user_id === $r->user()->id, 403);
@@ -167,6 +258,17 @@ class ReminderController extends Controller
         });
     }
 
+    /**
+     * @OA\Delete(
+     *     path="/api/reminders/{reminder}",
+     *     tags={"Reminders"},
+     *     summary="Delete a reminder",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="reminder", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(response=204, description="Reminder deleted successfully"),
+     *     @OA\Response(response=403, description="Forbidden")
+     * )
+     */
     public function destroy(Request $r, Reminder $reminder)
     {
         abort_unless($reminder->owner_user_id === $r->user()->id, 403);
@@ -174,6 +276,20 @@ class ReminderController extends Controller
         return response()->noContent();
     }
 
+    /**
+     * @OA\Post(
+     *     path="/api/reminders/{reminder}/done",
+     *     tags={"Reminders"},
+     *     summary="Mark reminder as done",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="reminder", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Reminder marked as done",
+     *         @OA\JsonContent(ref="#/components/schemas/Reminder")
+     *     )
+     * )
+     */
     public function markDone(Request $r, Reminder $reminder)
     {
         abort_unless($reminder->owner_user_id === $r->user()->id, 403);
@@ -182,6 +298,27 @@ class ReminderController extends Controller
     }
 
     /** BULK: status */
+    /**
+     * @OA\Post(
+     *     path="/api/reminders/bulk-status",
+     *     tags={"Reminders"},
+     *     summary="Bulk update reminder status",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"ids", "status"},
+     *             @OA\Property(property="ids", type="array", @OA\Items(type="integer")),
+     *             @OA\Property(property="status", type="string", enum={"pending", "done", "skipped", "cancelled"})
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Status updated",
+     *         @OA\JsonContent(@OA\Property(property="updated", type="integer"))
+     *     )
+     * )
+     */
     public function bulkStatus(Request $r)
     {
         $uid = $r->user()->id;
@@ -195,6 +332,29 @@ class ReminderController extends Controller
     }
 
     /** BULK: delete */
+    /**
+     * @OA\Post(
+     *     path="/api/reminders/bulk-delete",
+     *     tags={"Reminders"},
+     *     summary="Bulk delete reminders",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"ids"},
+     *             @OA\Property(property="ids", type="array", @OA\Items(type="integer"))
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Reminders deleted",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="deleted", type="integer"),
+     *             @OA\Property(property="found", type="array", @OA\Items(type="integer"))
+     *         )
+     *     )
+     * )
+     */
     public function bulkDelete(Request $r)
     {
         $uid = $r->user()->id;
@@ -228,6 +388,28 @@ class ReminderController extends Controller
     }
 
     /** Attach additional contacts to a reminder (without removing existing ones) */
+    /**
+     * @OA\Post(
+     *     path="/api/reminders/{reminder}/contacts",
+     *     tags={"Reminders"},
+     *     summary="Attach contacts to a reminder",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="reminder", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"ids"},
+     *             @OA\Property(property="ids", type="array", @OA\Items(type="integer")),
+     *             @OA\Property(property="set_primary", type="boolean", description="Set first contact as primary")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Contacts attached",
+     *         @OA\JsonContent(ref="#/components/schemas/Reminder")
+     *     )
+     * )
+     */
     public function attachContacts(Request $r, Reminder $reminder)
     {
         abort_unless($reminder->owner_user_id === $r->user()->id, 403);
@@ -253,7 +435,21 @@ class ReminderController extends Controller
         });
     }
 
-    /** Detach a contact from reminder; if it's the primary contact, switch primary to another contact in pivot */
+    /**
+     * @OA\Delete(
+     *     path="/api/reminders/{reminder}/contacts/{contact}",
+     *     tags={"Reminders"},
+     *     summary="Detach a contact from a reminder",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="reminder", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Parameter(name="contact", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Contact detached",
+     *         @OA\JsonContent(@OA\Property(property="ok", type="boolean"))
+     *     )
+     * )
+     */
     public function detachContact(Request $r, Reminder $reminder, int $contact)
     {
         abort_unless($reminder->owner_user_id === $r->user()->id, 403);
@@ -270,7 +466,23 @@ class ReminderController extends Controller
         });
     }
 
-    /** Reminders for a contact: match primary or in pivot */
+    /**
+     * @OA\Get(
+     *     path="/api/contacts/{contact}/reminders",
+     *     tags={"Reminders"},
+     *     summary="Get reminders for a specific contact",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="contact", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Parameter(name="per_page", in="query", @OA\Schema(type="string", default="50")),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Paginated reminders for contact",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Reminder"))
+     *         )
+     *     )
+     * )
+     */
     public function byContact(Request $r, Contact $contact)
     {
         abort_unless($contact->owner_user_id === $r->user()->id, 403);
@@ -286,9 +498,35 @@ class ReminderController extends Controller
         return $q->orderBy('due_at')->paginate($per);
     }
 
+    /**
+     * @OA\Get(
+     *     path="/api/reminders/pivot",
+     *     tags={"Reminders"},
+     *     summary="Get reminder-contact pivot data with filters",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="status", in="query", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="contact_id", in="query", @OA\Schema(type="integer")),
+     *     @OA\Parameter(name="after", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="before", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="overdue", in="query", @OA\Schema(type="boolean")),
+     *     @OA\Parameter(name="per_page", in="query", @OA\Schema(type="string", default="20")),
+     *     @OA\Parameter(name="page", in="query", @OA\Schema(type="integer", default=1)),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Pivot data with pagination",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="data", type="array", @OA\Items(type="object")),
+     *             @OA\Property(property="total", type="integer"),
+     *             @OA\Property(property="per_page", type="integer"),
+     *             @OA\Property(property="current_page", type="integer"),
+     *             @OA\Property(property="last_page", type="integer")
+     *         )
+     *     )
+     * )
+     */
    public function pivotIndex(Request $r)
-{
-    $uid = $r->user()->id;
+   {
+       $uid = $r->user()->id;
 
     // per_page: chấp nhận "20" hoặc "20/page"
     $perRaw = (string) $r->query('per_page', '20');

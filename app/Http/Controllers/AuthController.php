@@ -13,7 +13,31 @@ use App\Models\User;
 
 class AuthController extends Controller
 {
-    // Register: create user + send verification email
+    /**
+     * @OA\Post(
+     *     path="/api/register",
+     *     tags={"Authentication"},
+     *     summary="Register a new user",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"name","email","password"},
+     *             @OA\Property(property="name", type="string", example="John Doe"),
+     *             @OA\Property(property="email", type="string", format="email", example="john@example.com"),
+     *             @OA\Property(property="password", type="string", format="password", example="password123")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="User registered successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="token", type="string"),
+     *             @OA\Property(property="message", type="string"),
+     *             @OA\Property(property="verified", type="boolean")
+     *         )
+     *     )
+     * )
+     */
     public function register(Request $r)
     {
         $data = $r->validate([
@@ -38,28 +62,83 @@ class AuthController extends Controller
         ], 201);
     }
 
-    // Login
+    /**
+     * @OA\Post(
+     *     path="/api/login",
+     *     tags={"Authentication"},
+     *     summary="Login user",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"email","password"},
+     *             @OA\Property(property="email", type="string", format="email", example="john@example.com"),
+     *             @OA\Property(property="password", type="string", format="password", example="password123")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Login successful",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="token", type="string"),
+     *             @OA\Property(property="verified", type="boolean"),
+     *             @OA\Property(property="user", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=401, description="Invalid credentials")
+     * )
+     */
    public function login(Request $r)
-{
-    $r->validate(['email' => 'required|email', 'password' => 'required']);
-    $u = User::where('email', $r->email)->first();
+   {
+       $r->validate(['email' => 'required|email', 'password' => 'required']);
+       $u = User::where('email', $r->email)->first();
 
-    if (!$u || !Hash::check($r->password, $u->password)) {
-        return response()->json(['message' => 'Invalid credentials'], 401);
+       if (!$u || !Hash::check($r->password, $u->password)) {
+           return response()->json(['message' => 'Invalid credentials'], 401);
+       }
+
+       return response()->json([
+           'token'    => $u->createToken('api')->plainTextToken,
+           'verified' => (bool) $u->hasVerifiedEmail(),
+           'user'     => $u, 
+       ]);
     }
 
-    return response()->json([
-        'token'    => $u->createToken('api')->plainTextToken,
-        'verified' => (bool) $u->hasVerifiedEmail(),
-        'user'     => $u, 
-    ]);
-}
-
-
+    /**
+     * @OA\Get(
+     *     path="/api/me",
+     *     tags={"User"},
+     *     summary="Get current user",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Current user data",
+     *         @OA\JsonContent(ref="#/components/schemas/User")
+     *     ),
+     *     @OA\Response(response=401, description="Unauthenticated")
+     * )
+     */
     public function me(Request $r)      { return $r->user(); }
+
+    /**
+     * @OA\Post(
+     *     path="/api/logout",
+     *     tags={"Authentication"},
+     *     summary="Logout user",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(response=200, description="Logged out successfully")
+     * )
+     */
     public function logout(Request $r)  { $r->user()->currentAccessToken()?->delete(); return ['ok'=>true]; }
 
-    // Resend verification email
+    /**
+     * @OA\Post(
+     *     path="/api/email/resend",
+     *     tags={"Email Verification"},
+     *     summary="Resend verification email",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(response=200, description="Verification link sent")
+     * )
+     */
     public function resendVerification(Request $r)
     {
         if ($r->user()->hasVerifiedEmail()) {
@@ -70,33 +149,35 @@ class AuthController extends Controller
     }
 
     /**
-     * VERIFY EMAIL - STATELESS (no login required)
-     * Support ?login=1 for "verify + login":
-     *   - If login=1 and you want to return to FE with one-time code (secure): return redirect with #code=...
-     *   - (Optional) If you want to return token JSON directly, set $issueTokenDirect = true;
+     * @OA\Get(
+     *     path="/api/email/verify/{id}/{hash}",
+     *     tags={"Email Verification"},
+     *     summary="Verify email address",
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Parameter(name="hash", in="path", required=true, @OA\Schema(type="string")),
+     *     @OA\Response(response=302, description="Redirect to frontend")
+     * )
      */
-public function verifyEmail(Request $request, $id, $hash)
-{
-    if (! \Illuminate\Support\Facades\URL::hasValidSignature($request)) {
-        return response()->json(['message' => 'Invalid or expired link'], 400);
+    public function verifyEmail(Request $request, $id, $hash)
+    {
+        if (! \Illuminate\Support\Facades\URL::hasValidSignature($request)) {
+            return response()->json(['message' => 'Invalid or expired link'], 400);
+        }
+
+        $user = \App\Models\User::findOrFail($id);
+        if (! hash_equals(sha1($user->getEmailForVerification()), (string) $hash)) {
+            return response()->json(['message' => 'Invalid verification hash'], 400);
+        }
+
+        if (! $user->hasVerifiedEmail()) {
+            $user->markEmailAsVerified();
+            event(new \Illuminate\Auth\Events\Verified($user));
+        }
+
+        // ➜ Redirect to FE success page (with email if you want to display)
+        $fe = rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/');
+        return redirect()->away($fe . '/verify-success?email=' . urlencode($user->email));
     }
-
-    $user = \App\Models\User::findOrFail($id);
-    if (! hash_equals(sha1($user->getEmailForVerification()), (string) $hash)) {
-        return response()->json(['message' => 'Invalid verification hash'], 400);
-    }
-
-    if (! $user->hasVerifiedEmail()) {
-        $user->markEmailAsVerified();
-        event(new \Illuminate\Auth\Events\Verified($user));
-    }
-
-    // ➜ Redirect to FE success page (with email if you want to display)
-    $fe = rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/');
-    return redirect()->away($fe . '/verify-success?email=' . urlencode($user->email));
-}
-
-
 
     // Exchange magic code -> token (one-time use)
     public function magicExchange(Request $r)
@@ -119,102 +200,157 @@ public function verifyEmail(Request $request, $id, $hash)
         ]);
     }
 
+    /**
+     * @OA\Post(
+     *     path="/api/password/request",
+     *     tags={"Password Reset"},
+     *     summary="Request password reset code",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"email","new_password"},
+     *             @OA\Property(property="email", type="string", format="email"),
+     *             @OA\Property(property="new_password", type="string", format="password", minLength=6)
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Code sent if email exists")
+     * )
+     */
     public function passwordRequest(Request $r)
-{
-    $data = $r->validate([
-        'email'        => 'required|email',
-        'new_password' => 'required|string|min:6|max:100',
-    ]);
+    {
+        $data = $r->validate([
+            'email'        => 'required|email',
+            'new_password' => 'required|string|min:6|max:100',
+        ]);
 
-    $user = User::where('email', $data['email'])->first();
-    // Prevent email enumeration: still return OK message
-    if (!$user) return response()->json(['message' => 'If the email exists, a code has been sent'], 200);
+        $user = User::where('email', $data['email'])->first();
+        // Prevent email enumeration: still return OK message
+        if (!$user) return response()->json(['message' => 'If the email exists, a code has been sent'], 200);
 
-    $code = (string) random_int(100000, 999999); // 6 digits
-    $ttl  = 10; // minutes
+        $code = (string) random_int(100000, 999999); // 6 digits
+        $ttl  = 10; // minutes
 
-    $cacheKey = 'pwreset:'.$user->id;
-    Cache::put($cacheKey, [
-        'code' => $code,
-        'hash' => Hash::make($data['new_password']), // store HASH of new password
-    ], now()->addMinutes($ttl));
+        $cacheKey = 'pwreset:'.$user->id;
+        Cache::put($cacheKey, [
+            'code' => $code,
+            'hash' => Hash::make($data['new_password']), // store HASH of new password
+        ], now()->addMinutes($ttl));
 
-    try {
-        $user->notify(new PasswordResetCode($code, $ttl));
-    } catch (\Throwable $e) {
-        \Log::warning('Send reset code failed: '.$e->getMessage());
+        try {
+            $user->notify(new PasswordResetCode($code, $ttl));
+        } catch (\Throwable $e) {
+            \Log::warning('Send reset code failed: '.$e->getMessage());
+        }
+
+        return response()->json(['message' => 'Verification code sent if the email exists'], 200);
     }
 
-    return response()->json(['message' => 'Verification code sent if the email exists'], 200);
-}
+    /**
+     * @OA\Post(
+     *     path="/api/password/resend",
+     *     tags={"Password Reset"},
+     *     summary="Resend password reset code",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"email"},
+     *             @OA\Property(property="email", type="string", format="email")
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Code re-sent")
+     * )
+     */
+    public function passwordResend(Request $r)
+    {
+        $data = $r->validate(['email' => 'required|email']);
+        $user = User::where('email', $data['email'])->first();
+        if (!$user) return response()->json(['message' => 'Verification code re-sent if the email exists'], 200);
 
-/**
- * (Optional) B1b: resend old code / new code
- * body: { email }
- */
-public function passwordResend(Request $r)
-{
-    $data = $r->validate(['email' => 'required|email']);
-    $user = User::where('email', $data['email'])->first();
-    if (!$user) return response()->json(['message' => 'Verification code re-sent if the email exists'], 200);
+        $cacheKey = 'pwreset:'.$user->id;
+        $payload = Cache::get($cacheKey);
+        if (!$payload) return response()->json(['message' => 'No pending reset. Please start again.'], 400);
 
-    $cacheKey = 'pwreset:'.$user->id;
-    $payload = Cache::get($cacheKey);
-    if (!$payload) return response()->json(['message' => 'No pending reset. Please start again.'], 400);
+        // Generate new code for security
+        $code = (string) random_int(100000, 999999);
+        $payload['code'] = $code;
+        Cache::put($cacheKey, $payload, now()->addMinutes(10));
 
-    // Generate new code for security
-    $code = (string) random_int(100000, 999999);
-    $payload['code'] = $code;
-    Cache::put($cacheKey, $payload, now()->addMinutes(10));
-
-    try { $user->notify(new PasswordResetCode($code, 10)); } catch (\Throwable $e) {}
-    return response()->json(['message' => 'Verification code re-sent'], 200);
-}
-
-/**
- * B2: Verify code & change password (PUBLIC, throttle)
- * body: { email, code }
- */
-public function passwordVerify(Request $r)
-{
-    $data = $r->validate([
-        'email' => 'required|email',
-        'code'  => 'required|digits:6',
-    ]);
-
-    $user = User::where('email', $data['email'])->firstOrFail();
-
-    $cacheKey = 'pwreset:'.$user->id;
-    $payload  = Cache::get($cacheKey);
-
-    if (!$payload) {
-        return response()->json(['message' => 'Code invalid or expired'], 400);
+        try { $user->notify(new PasswordResetCode($code, 10)); } catch (\Throwable $e) {}
+        return response()->json(['message' => 'Verification code re-sent'], 200);
     }
 
-    if ((string)$payload['code'] !== (string)$data['code']) {
-        return response()->json(['message' => 'Invalid code'], 400);
+    /**
+     * @OA\Post(
+     *     path="/api/password/verify",
+     *     tags={"Password Reset"},
+     *     summary="Verify code and reset password",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"email","code"},
+     *             @OA\Property(property="email", type="string", format="email"),
+     *             @OA\Property(property="code", type="string", pattern="^\d{6}$")
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Password reset successful")
+     * )
+     */
+    public function passwordVerify(Request $r)
+    {
+        $data = $r->validate([
+            'email' => 'required|email',
+            'code'  => 'required|digits:6',
+        ]);
+
+        $user = User::where('email', $data['email'])->firstOrFail();
+
+        $cacheKey = 'pwreset:'.$user->id;
+        $payload  = Cache::get($cacheKey);
+
+        if (!$payload) {
+            return response()->json(['message' => 'Code invalid or expired'], 400);
+        }
+
+        if ((string)$payload['code'] !== (string)$data['code']) {
+            return response()->json(['message' => 'Invalid code'], 400);
+        }
+
+        // Update password: use stored HASH
+        $user->password = $payload['hash'];
+        $user->save();
+
+        // Invalidate code + (recommended) revoke old tokens
+        Cache::forget($cacheKey);
+        try { $user->tokens()->delete(); } catch (\Throwable $e) {}
+
+        return response()->json(['message' => 'Password has been reset. Please log in with your new password.'], 200);
     }
 
-    // Update password: use stored HASH
-    $user->password = $payload['hash'];
-    $user->save();
-
-    // Invalidate code + (recommended) revoke old tokens
-    Cache::forget($cacheKey);
-    try { $user->tokens()->delete(); } catch (\Throwable $e) {}
-
-    return response()->json(['message' => 'Password has been reset. Please log in with your new password.'], 200);
-}
-
-public function updateMe(Request $r) {
-  $u = $r->user();
-  $data = $r->validate([
-    'name' => 'sometimes|string|max:100',
-    'email'=> 'sometimes|email|unique:users,email,'.$u->id,
-    'password' => 'sometimes|string|min:6',
-  ]);
-  if (isset($data['password'])) $data['password'] = \Hash::make($data['password']);
-  $u->fill($data)->save();
-  return $u;
-}
+    /**
+     * @OA\Put(
+     *     path="/api/me",
+     *     tags={"User"},
+     *     summary="Update current user",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         @OA\JsonContent(
+     *             @OA\Property(property="name", type="string"),
+     *             @OA\Property(property="email", type="string", format="email"),
+     *             @OA\Property(property="password", type="string", format="password")
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="User updated")
+     * )
+     */
+    public function updateMe(Request $r) {
+      $u = $r->user();
+      $data = $r->validate([
+        'name' => 'sometimes|string|max:100',
+        'email'=> 'sometimes|email|unique:users,email,'.$u->id,
+        'password' => 'sometimes|string|min:6',
+      ]);
+      if (isset($data['password'])) $data['password'] = \Hash::make($data['password']);
+      $u->fill($data)->save();
+      return $u;
+    }
 }
