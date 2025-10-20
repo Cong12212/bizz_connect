@@ -12,4 +12,9 @@ RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --opt
     && chown -R application:application storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
-# NOTE: KHÔNG đặt USER, KHÔNG override ENTRYPOINT/CMD
+# thêm entrypoint tự chạy migrate/swagger
+COPY docker/entrypoint.sh /usr/local/bin/app-entry.sh
+RUN chmod +x /usr/local/bin/app-entry.sh
+
+# dùng entrypoint của mình (chạy supervisord trực tiếp)
+ENTRYPOINT ["/usr/local/bin/app-entry.sh"]
