@@ -1,22 +1,22 @@
 #!/usr/bin/env sh
 set -e
 
-# Dọn cache & link storage (không lỗi nếu đã có)
+# Clear cache, storage link
 php artisan storage:link || true
 php artisan config:clear || true
 php artisan route:clear || true
 php artisan view:clear || true
 
-# Build cache mới
+# Rebuild cache
 php artisan config:cache || true
 php artisan route:cache || true
 php artisan view:cache || true
 
-# Chạy migrate (nếu DB env đúng sẽ tạo bảng)
+# Run migrations (ignore error if DB not ready yet)
 php artisan migrate --force || true
 
-# Nếu bạn dùng L5-Swagger (có package), generate docs
+# Generate Swagger docs if L5-Swagger exists
 php artisan l5-swagger:generate --quiet || true
 
-# Khởi động nginx + php-fpm qua supervisord
-exec /usr/bin/supervisord -n
+# Cuối cùng: KHỞI ĐỘNG lại PHP-FPM + Nginx qua supervisord
+exec /entrypoint supervisord
