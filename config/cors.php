@@ -1,17 +1,21 @@
 <?php
 
-use Illuminate\Foundation\Application;
-use Illuminate\Foundation\Configuration\Middleware;
+return [
+    'paths' => ['api/*', 'auth/*', 'login', 'logout', 'user', 'sanctum/csrf-cookie'],
+    'allowed_methods' => ['*'],
 
-return Application::configure(base_path())
-    ->withMiddleware(function (Middleware $middleware) {
-        // Bật CORS toàn cục
-        $middleware->append(\Fruitcake\Cors\HandleCors::class);
-    })
-    ->withRouting(
-        web: base_path('routes/web.php'),
-        api: base_path('routes/api.php'),
-        commands: base_path('routes/console.php'),
-        health: '/up',
-    )
-    ->create();
+    // Cho domain nào được gọi API (thêm domain FE thật của bạn nếu có)
+    'allowed_origins' => [
+        'http://localhost:5173',
+        'https://localhost:5173',
+        // 'https://app.yourdomain.com',
+    ],
+    'allowed_origins_patterns' => [],
+
+    'allowed_headers' => ['*'],
+    'exposed_headers' => [],
+    'max_age' => 0,
+
+    // Bearer token => KHÔNG dùng cookie
+    'supports_credentials' => false,
+];
