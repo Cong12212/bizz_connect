@@ -36,6 +36,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('auth/logout', [AuthController::class,'logout']);
     Route::patch('auth/me', [AuthController::class,'updateMe']);
 
+    Route::post('email/verification-notification', [AuthController::class, 'resendVerification']);
 });
 
 /**
@@ -65,14 +66,23 @@ Route::middleware(['auth:sanctum','verified'])->group(function () {
     Route::put('/tags/{tag}', [TagController::class, 'update'])->whereNumber('tag');
     Route::delete('/tags/{tag}', [TagController::class, 'destroy'])->whereNumber('tag');
 
-   Route::get('/reminders', [ReminderController::class, 'index']);
+    Route::get('/reminders', [ReminderController::class, 'index']);
     Route::post('/reminders', [ReminderController::class, 'store']);
     Route::get('/reminders/{reminder}', [ReminderController::class, 'show'])->whereNumber('reminder');
     Route::patch('/reminders/{reminder}', [ReminderController::class, 'update'])->whereNumber('reminder');
     Route::delete('/reminders/{reminder}', [ReminderController::class, 'destroy'])->whereNumber('reminder');
+    
+    // Add missing routes
+    Route::post('/reminders/{reminder}/done', [ReminderController::class, 'markDone'])->whereNumber('reminder');
+    Route::post('/reminders/{reminder}/contacts', [ReminderController::class, 'attachContacts'])->whereNumber('reminder');
+    Route::delete('/reminders/{reminder}/contacts/{contact}', [ReminderController::class, 'detachContact'])->whereNumber('reminder')->whereNumber('contact');
+    
     Route::post('/reminders/bulk-status', [ReminderController::class, 'bulkStatus']);
     Route::post('/reminders/bulk-delete', [ReminderController::class, 'bulkDelete']);
     Route::get('/reminders/pivot', [ReminderController::class, 'pivotIndex']);
+
+    // Add route for reminders by contact
+    Route::get('/contacts/{contact}/reminders', [ReminderController::class, 'byContact'])->whereNumber('contact');
 
     Route::get   ('/notifications', [NotificationController::class, 'index']);
 Route::post  ('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->whereNumber('notification');

@@ -10,18 +10,18 @@
     },
     "servers": [
         {
-            "url": "http://my-default-host.com",
+            "url": "https://bizz-connect.onrender.com",
             "description": "API Server"
         }
     ],
     "paths": {
-        "/api/register": {
+        "/api/auth/register": {
             "post": {
                 "tags": [
                     "Authentication"
                 ],
                 "summary": "Register a new user",
-                "operationId": "8a56853624e025573120a09a4c75d468",
+                "operationId": "d764dd091cc4494ae0baf360b03319f3",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -78,13 +78,13 @@
                 }
             }
         },
-        "/api/login": {
+        "/api/auth/login": {
             "post": {
                 "tags": [
                     "Authentication"
                 ],
                 "summary": "Login user",
-                "operationId": "a3b306d14572d1f4bd6c064b3233e7b8",
+                "operationId": "8dcb70df1020986038d098cc08d05dae",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -139,13 +139,13 @@
                 }
             }
         },
-        "/api/me": {
+        "/api/auth/me": {
             "get": {
                 "tags": [
                     "User"
                 ],
                 "summary": "Get current user",
-                "operationId": "9d9bc556f927575aa492a88c28fe5908",
+                "operationId": "b9abb1a7a74670a19c215c2c133f14d8",
                 "responses": {
                     "200": {
                         "description": "Current user data",
@@ -167,12 +167,12 @@
                     }
                 ]
             },
-            "put": {
+            "patch": {
                 "tags": [
                     "User"
                 ],
                 "summary": "Update current user",
-                "operationId": "5f1c364e899b18491e53b876670339b6",
+                "operationId": "046e606525086f1c504244bbb7ca3e15",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -207,13 +207,13 @@
                 ]
             }
         },
-        "/api/logout": {
+        "/api/auth/logout": {
             "post": {
                 "tags": [
                     "Authentication"
                 ],
                 "summary": "Logout user",
-                "operationId": "fe8f3429cd6979b3b4517e186505f9f9",
+                "operationId": "69281b12abb272c76871f19cb17ca563",
                 "responses": {
                     "200": {
                         "description": "Logged out successfully"
@@ -226,13 +226,13 @@
                 ]
             }
         },
-        "/api/email/resend": {
+        "/api/email/verification-notification": {
             "post": {
                 "tags": [
                     "Email Verification"
                 ],
                 "summary": "Resend verification email",
-                "operationId": "ef758aa84f7a4b60f0491e92f9ac64ec",
+                "operationId": "45dddfb895a80ef22fb8d21ae62e2d10",
                 "responses": {
                     "200": {
                         "description": "Verification link sent"
@@ -277,13 +277,13 @@
                 }
             }
         },
-        "/api/password/request": {
+        "/api/auth/password/request": {
             "post": {
                 "tags": [
                     "Password Reset"
                 ],
                 "summary": "Request password reset code",
-                "operationId": "7e30374a7b8b5cebad3c2f1ec7e4e509",
+                "operationId": "6ff862dc5f58cd2d5367e0760951b9c1",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -316,13 +316,13 @@
                 }
             }
         },
-        "/api/password/resend": {
+        "/api/auth/password/resend": {
             "post": {
                 "tags": [
                     "Password Reset"
                 ],
                 "summary": "Resend password reset code",
-                "operationId": "0c0877d66bfda5fa43591e4df081c559",
+                "operationId": "fa608f42b807617f43f4950c28d643ea",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -349,13 +349,13 @@
                 }
             }
         },
-        "/api/password/verify": {
+        "/api/auth/password/verify": {
             "post": {
                 "tags": [
                     "Password Reset"
                 ],
                 "summary": "Verify code and reset password",
-                "operationId": "ee4bf57badfe0c3fe627463d7b955a86",
+                "operationId": "1485a2f055dcc4acee2ad4200d09193c",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -1910,12 +1910,42 @@
                     }
                 ]
             },
-            "put": {
+            "delete": {
+                "tags": [
+                    "Reminders"
+                ],
+                "summary": "Delete a reminder",
+                "operationId": "e825f297d64550e7da2679ad08723252",
+                "parameters": [
+                    {
+                        "name": "reminder",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Reminder deleted successfully"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
                 "tags": [
                     "Reminders"
                 ],
                 "summary": "Update a reminder",
-                "operationId": "390fdf944d7530167d4e3a4edb7607e6",
+                "operationId": "80cd5c8baedc461dda1420cee411b206",
                 "parameters": [
                     {
                         "name": "reminder",
@@ -1984,36 +2014,6 @@
                                 }
                             }
                         }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "delete": {
-                "tags": [
-                    "Reminders"
-                ],
-                "summary": "Delete a reminder",
-                "operationId": "e825f297d64550e7da2679ad08723252",
-                "parameters": [
-                    {
-                        "name": "reminder",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "Reminder deleted successfully"
-                    },
-                    "403": {
-                        "description": "Forbidden"
                     }
                 },
                 "security": [

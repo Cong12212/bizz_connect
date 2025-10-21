@@ -179,9 +179,8 @@ class ReminderController extends Controller
         });
     }
 
-    /** UPDATE: allows replacing entire contacts list (pivot) + change primary */
     /**
-     * @OA\Put(
+     * @OA\Patch(
      *     path="/api/reminders/{reminder}",
      *     tags={"Reminders"},
      *     summary="Update a reminder",

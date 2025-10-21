@@ -15,7 +15,7 @@ class AuthController extends Controller
 {
     /**
      * @OA\Post(
-     *     path="/api/register",
+     *     path="/api/auth/register",
      *     tags={"Authentication"},
      *     summary="Register a new user",
      *     @OA\RequestBody(
@@ -64,7 +64,7 @@ class AuthController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/login",
+     *     path="/api/auth/login",
      *     tags={"Authentication"},
      *     summary="Login user",
      *     @OA\RequestBody(
@@ -105,7 +105,7 @@ class AuthController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/me",
+     *     path="/api/auth/me",
      *     tags={"User"},
      *     summary="Get current user",
      *     security={{"bearerAuth":{}}},
@@ -121,7 +121,7 @@ class AuthController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/logout",
+     *     path="/api/auth/logout",
      *     tags={"Authentication"},
      *     summary="Logout user",
      *     security={{"bearerAuth":{}}},
@@ -132,7 +132,7 @@ class AuthController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/email/resend",
+     *     path="/api/email/verification-notification",
      *     tags={"Email Verification"},
      *     summary="Resend verification email",
      *     security={{"bearerAuth":{}}},
@@ -202,7 +202,7 @@ class AuthController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/password/request",
+     *     path="/api/auth/password/request",
      *     tags={"Password Reset"},
      *     summary="Request password reset code",
      *     @OA\RequestBody(
@@ -247,7 +247,7 @@ class AuthController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/password/resend",
+     *     path="/api/auth/password/resend",
      *     tags={"Password Reset"},
      *     summary="Resend password reset code",
      *     @OA\RequestBody(
@@ -281,7 +281,7 @@ class AuthController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/password/verify",
+     *     path="/api/auth/password/verify",
      *     tags={"Password Reset"},
      *     summary="Verify code and reset password",
      *     @OA\RequestBody(
@@ -327,8 +327,8 @@ class AuthController extends Controller
     }
 
     /**
-     * @OA\Put(
-     *     path="/api/me",
+     * @OA\Patch(
+     *     path="/api/auth/me",
      *     tags={"User"},
      *     summary="Update current user",
      *     security={{"bearerAuth":{}}},
