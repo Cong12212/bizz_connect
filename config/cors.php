@@ -7,7 +7,7 @@ return [
     // Cho domain nào được gọi API (thêm domain FE thật của bạn nếu có)
     'allowed_origins' => [
         'http://localhost:5173',
-        'https://localhost:5173',
+        'https://bizz-connect-web.onrender.com',
         // 'https://app.yourdomain.com',
     ],
     'allowed_origins_patterns' => [],

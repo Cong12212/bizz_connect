@@ -162,14 +162,14 @@ class AuthController extends Controller
 {
     // Validate signed URL
     if (!$request->hasValidSignature()) {
-        $fe = rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/');
+        $fe = config('app.frontend_url', 'http://localhost:5173');
         return redirect()->away($fe.'/verify-error?reason=invalid_signature');
     }
 
     $user = \App\Models\User::findOrFail($id);
 
     if (! hash_equals(sha1($user->getEmailForVerification()), (string) $hash)) {
-        $fe = rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/');
+        $fe = config('app.frontend_url', 'http://localhost:5173');
         return redirect()->away($fe.'/verify-error?reason=invalid_hash');
     }
 
@@ -178,7 +178,7 @@ class AuthController extends Controller
         event(new \Illuminate\Auth\Events\Verified($user));
     }
 
-    $fe = rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/');
+    $fe = config('app.frontend_url', 'http://localhost:5173');
     return redirect()->away($fe.'/verify-success?email='.urlencode($user->email));
 }
 
