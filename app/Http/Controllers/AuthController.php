@@ -158,13 +158,19 @@ class AuthController extends Controller
      *     @OA\Response(response=302, description="Redirect to frontend")
      * )
      */
-   public function verifyEmail(Request $request, $id, $hash)
+  public function verifyEmail(Request $request, $id, $hash)
 {
+    // Validate signed URL
+    if (!$request->hasValidSignature()) {
+        $fe = rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/');
+        return redirect()->away($fe.'/verify-error?reason=invalid_signature');
+    }
+
     $user = \App\Models\User::findOrFail($id);
 
-    // Bảo vệ: khớp hash
     if (! hash_equals(sha1($user->getEmailForVerification()), (string) $hash)) {
-        return response()->json(['message' => 'Invalid verification hash'], 400);
+        $fe = rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/');
+        return redirect()->away($fe.'/verify-error?reason=invalid_hash');
     }
 
     if (! $user->hasVerifiedEmail()) {
