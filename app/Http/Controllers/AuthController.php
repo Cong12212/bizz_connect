@@ -158,26 +158,23 @@ class AuthController extends Controller
      *     @OA\Response(response=302, description="Redirect to frontend")
      * )
      */
-    public function verifyEmail(Request $request, $id, $hash)
-    {
-        if (! \Illuminate\Support\Facades\URL::hasValidSignature($request)) {
-            return response()->json(['message' => 'Invalid or expired link'], 400);
-        }
+   public function verifyEmail(Request $request, $id, $hash)
+{
+    $user = \App\Models\User::findOrFail($id);
 
-        $user = \App\Models\User::findOrFail($id);
-        if (! hash_equals(sha1($user->getEmailForVerification()), (string) $hash)) {
-            return response()->json(['message' => 'Invalid verification hash'], 400);
-        }
-
-        if (! $user->hasVerifiedEmail()) {
-            $user->markEmailAsVerified();
-            event(new \Illuminate\Auth\Events\Verified($user));
-        }
-
-        // ➜ Redirect to FE success page (with email if you want to display)
-        $fe = rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/');
-        return redirect()->away($fe . '/verify-success?email=' . urlencode($user->email));
+    // Bảo vệ: khớp hash
+    if (! hash_equals(sha1($user->getEmailForVerification()), (string) $hash)) {
+        return response()->json(['message' => 'Invalid verification hash'], 400);
     }
+
+    if (! $user->hasVerifiedEmail()) {
+        $user->markEmailAsVerified();
+        event(new \Illuminate\Auth\Events\Verified($user));
+    }
+
+    $fe = rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/');
+    return redirect()->away($fe.'/verify-success?email='.urlencode($user->email));
+}
 
     // Exchange magic code -> token (one-time use)
     public function magicExchange(Request $r)

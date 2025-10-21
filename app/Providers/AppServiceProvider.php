@@ -17,7 +17,7 @@ class AppServiceProvider extends ServiceProvider
 
         // Force https khi chạy production trên Render
         if (app()->environment('production')) {
-            URL::forceScheme('https');
+          \Illuminate\Support\Facades\URL::forceScheme('https');
         }
 
         // Chuẩn hoá serialize ngày giờ
