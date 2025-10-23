@@ -4,14 +4,15 @@ return [
     'paths' => ['api/*', 'auth/*', 'login', 'logout', 'user', 'sanctum/csrf-cookie'],
     'allowed_methods' => ['*'],
 
-    // Cho domain nào được gọi API (thêm domain FE thật của bạn nếu có)
+    // ✅ Cho phép tất cả localhost bằng pattern
     'allowed_origins' => [
-        'http://localhost:5173',
         'https://bizz-connect-web.onrender.com',
-        'http://localhost:52713'
         // 'https://app.yourdomain.com',
     ],
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => [
+        '/^http:\/\/localhost:\d+$/',     
+        '/^http:\/\/127\.0\.0\.1:\d+$/',  
+    ],
 
     'allowed_headers' => ['*'],
     'exposed_headers' => [],
