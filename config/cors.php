@@ -8,6 +8,7 @@ return [
     'allowed_origins' => [
         'http://localhost:5173',
         'https://bizz-connect-web.onrender.com',
+        'http://localhost:52713'
         // 'https://app.yourdomain.com',
     ],
     'allowed_origins_patterns' => [],
