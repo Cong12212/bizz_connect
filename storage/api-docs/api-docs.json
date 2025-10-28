@@ -387,34 +387,64 @@
                 }
             }
         },
-        "/api/billing/subscribe/personal": {
+        "/api/business-cards": {
+            "get": {
+                "tags": [
+                    "Business Card"
+                ],
+                "summary": "Get all business cards",
+                "operationId": "b2cfeba716a83ef57680d420f1206157",
+                "responses": {
+                    "200": {
+                        "description": "List of business cards",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/BusinessCard"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
             "post": {
                 "tags": [
-                    "Billing"
+                    "Business Card"
                 ],
-                "summary": "Subscribe to personal plan",
-                "operationId": "535143e77f6841d88a254aab95ccacf6",
+                "summary": "Create a business card",
+                "operationId": "0adb369481048e09a76d1e31c48885b3",
                 "requestBody": {
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "required": [
-                                    "plan"
+                                    "full_name",
+                                    "email"
                                 ],
                                 "properties": {
-                                    "plan": {
-                                        "type": "string",
-                                        "enum": [
-                                            "pro",
-                                            "pro_plus"
-                                        ],
-                                        "example": "pro"
+                                    "company_id": {
+                                        "type": "integer"
                                     },
-                                    "period_end": {
-                                        "type": "string",
-                                        "format": "date",
-                                        "example": "2024-12-31"
+                                    "full_name": {
+                                        "type": "string"
+                                    },
+                                    "job_title": {
+                                        "type": "string"
+                                    },
+                                    "email": {
+                                        "type": "string"
+                                    },
+                                    "phone": {
+                                        "type": "string"
                                     }
                                 },
                                 "type": "object"
@@ -423,29 +453,8 @@
                     }
                 },
                 "responses": {
-                    "200": {
-                        "description": "Subscription created successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "subscription": {
-                                            "type": "object"
-                                        },
-                                        "is_plus": {
-                                            "type": "boolean"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthenticated"
-                    },
-                    "422": {
-                        "description": "Validation error"
+                    "201": {
+                        "description": "Business card created"
                     }
                 },
                 "security": [
@@ -455,39 +464,57 @@
                 ]
             }
         },
-        "/api/billing/subscribe/company": {
-            "post": {
+        "/api/business-cards/{id}": {
+            "get": {
                 "tags": [
-                    "Billing"
+                    "Business Card"
                 ],
-                "summary": "Subscribe to company plan",
-                "operationId": "30b329b15e4bb04b2bcf5d6882a8efff",
+                "summary": "Get a business card",
+                "operationId": "d0bb3768ccd556ec912df5dddf55bf93",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Business card details"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Business Card"
+                ],
+                "summary": "Update a business card",
+                "operationId": "087029dd4ac05813335eb147cfc21800",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
                 "requestBody": {
-                    "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
-                                "required": [
-                                    "company_id",
-                                    "plan"
-                                ],
                                 "properties": {
-                                    "company_id": {
-                                        "type": "integer",
-                                        "example": 1
-                                    },
-                                    "plan": {
-                                        "type": "string",
-                                        "enum": [
-                                            "pro",
-                                            "pro_plus"
-                                        ],
-                                        "example": "pro_plus"
-                                    },
-                                    "period_end": {
-                                        "type": "string",
-                                        "format": "date",
-                                        "example": "2024-12-31"
+                                    "full_name": {
+                                        "type": "string"
                                     }
                                 },
                                 "type": "object"
@@ -497,28 +524,229 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Company subscription created successfully",
+                        "description": "Business card updated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Business Card"
+                ],
+                "summary": "Delete a business card",
+                "operationId": "d97c342d27e111087f599fc401cd0895",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Deleted"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/companies": {
+            "get": {
+                "tags": [
+                    "Company"
+                ],
+                "summary": "Get all companies for authenticated user",
+                "operationId": "54f966c056050f9db4fff6ee5a45a76a",
+                "responses": {
+                    "200": {
+                        "description": "List of companies",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "properties": {
-                                        "subscription": {
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/Company"
+                                    }
                                 }
                             }
                         }
-                    },
-                    "401": {
-                        "description": "Unauthenticated"
-                    },
-                    "404": {
-                        "description": "Company not found"
-                    },
-                    "422": {
-                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Company"
+                ],
+                "summary": "Create a new company",
+                "operationId": "00e2db7b0f71c32b377f4dfc4dd685a8",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "Tech Corp"
+                                    },
+                                    "domain": {
+                                        "type": "string",
+                                        "example": "techcorp.com"
+                                    },
+                                    "industry": {
+                                        "type": "string",
+                                        "example": "Technology"
+                                    },
+                                    "description": {
+                                        "type": "string"
+                                    },
+                                    "website": {
+                                        "type": "string"
+                                    },
+                                    "email": {
+                                        "type": "string"
+                                    },
+                                    "phone": {
+                                        "type": "string"
+                                    },
+                                    "address": {
+                                        "type": "string"
+                                    },
+                                    "city": {
+                                        "type": "string"
+                                    },
+                                    "country": {
+                                        "type": "string"
+                                    },
+                                    "logo": {
+                                        "type": "string",
+                                        "format": "binary"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Company created"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/companies/{id}": {
+            "get": {
+                "tags": [
+                    "Company"
+                ],
+                "summary": "Get a company",
+                "operationId": "01c261c039e4b27beeb888ef46bd86db",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Company details"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Company"
+                ],
+                "summary": "Update a company",
+                "operationId": "6a1d7a4a2b9cbdfe7749cef78e6cec57",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Company updated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Company"
+                ],
+                "summary": "Delete a company",
+                "operationId": "49d767f608bffc95ad39368bf1766693",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Company deleted"
                     }
                 },
                 "security": [
@@ -2852,6 +3080,151 @@
                     }
                 },
                 "type": "object"
+            },
+            "BusinessCard": {
+                "title": "Business Card",
+                "required": [
+                    "full_name",
+                    "email"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "user_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "company_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "full_name": {
+                        "type": "string",
+                        "example": "John Doe"
+                    },
+                    "job_title": {
+                        "type": "string",
+                        "example": "Software Engineer"
+                    },
+                    "department": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string"
+                    },
+                    "phone": {
+                        "type": "string"
+                    },
+                    "mobile": {
+                        "type": "string"
+                    },
+                    "website": {
+                        "type": "string"
+                    },
+                    "address": {
+                        "type": "string"
+                    },
+                    "linkedin": {
+                        "type": "string"
+                    },
+                    "facebook": {
+                        "type": "string"
+                    },
+                    "twitter": {
+                        "type": "string"
+                    },
+                    "avatar": {
+                        "type": "string"
+                    },
+                    "notes": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "Company": {
+                "title": "Company",
+                "required": [
+                    "name"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "user_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Tech Corp"
+                    },
+                    "domain": {
+                        "type": "string",
+                        "example": "techcorp.com"
+                    },
+                    "industry": {
+                        "type": "string",
+                        "example": "Technology"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "website": {
+                        "type": "string",
+                        "example": "https://techcorp.com"
+                    },
+                    "email": {
+                        "type": "string",
+                        "example": "info@techcorp.com"
+                    },
+                    "phone": {
+                        "type": "string",
+                        "example": "+1234567890"
+                    },
+                    "address": {
+                        "type": "string"
+                    },
+                    "city": {
+                        "type": "string",
+                        "example": "San Francisco"
+                    },
+                    "country": {
+                        "type": "string",
+                        "example": "USA"
+                    },
+                    "logo": {
+                        "type": "string"
+                    },
+                    "plan": {
+                        "type": "string",
+                        "example": "free"
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "active"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
             }
         },
         "securitySchemes": {
@@ -2881,8 +3254,12 @@
             "description": "Password Reset"
         },
         {
-            "name": "Billing",
-            "description": "Billing"
+            "name": "Business Card",
+            "description": "Business Card"
+        },
+        {
+            "name": "Company",
+            "description": "Company"
         },
         {
             "name": "Contacts",

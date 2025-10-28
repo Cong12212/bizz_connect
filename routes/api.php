@@ -5,36 +5,38 @@ use Illuminate\Http\Request;
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ContactController;
-use App\Http\Controllers\TagController;             
+use App\Http\Controllers\TagController;
 use App\Http\Controllers\ContactTagController;
-use App\Http\Controllers\ReminderController;   
+use App\Http\Controllers\ReminderController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\BusinessCardController;
 
 /**
  * AUTH (public)
  */
 Route::prefix('auth')->group(function () {
-    Route::post('register', [AuthController::class,'register']);
-    Route::post('login',    [AuthController::class,'login']);
-    Route::post('magic/exchange', [AuthController::class,'magicExchange']);
+    Route::post('register', [AuthController::class, 'register']);
+    Route::post('login',    [AuthController::class, 'login']);
+    Route::post('magic/exchange', [AuthController::class, 'magicExchange']);
 
     Route::post('password/request', [AuthController::class, 'passwordRequest']);
     Route::post('password/resend',  [AuthController::class, 'passwordResend']);
     Route::post('password/verify',  [AuthController::class, 'passwordVerify']);
 });
 
-Route::get('email/verify/{id}/{hash}', [AuthController::class,'verifyEmail'])
+Route::get('email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
     ->middleware(['signed'])
     ->name('verification.verify');
 
-Route::middleware('auth:sanctum')->get('email/verified', fn (Request $r) => [
+Route::middleware('auth:sanctum')->get('email/verified', fn(Request $r) => [
     'verified' => (bool) $r->user()->hasVerifiedEmail(),
 ]);
 
 Route::middleware(['auth:sanctum'])->group(function () {
-    Route::get('auth/me',      [AuthController::class,'me']);
-    Route::post('auth/logout', [AuthController::class,'logout']);
-    Route::patch('auth/me', [AuthController::class,'updateMe']);
+    Route::get('auth/me',      [AuthController::class, 'me']);
+    Route::post('auth/logout', [AuthController::class, 'logout']);
+    Route::patch('auth/me', [AuthController::class, 'updateMe']);
 
     Route::post('email/verification-notification', [AuthController::class, 'resendVerification']);
 });
@@ -42,9 +44,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
 /**
  * MAIN API — requires LOGIN + VERIFIED
  */
-Route::middleware(['auth:sanctum','verified'])->group(function () {
+Route::middleware(['auth:sanctum', 'verified'])->group(function () {
     // Export/Import placed BEFORE {contact} routes
-    Route::match(['GET','POST'], '/contacts/export', [ContactController::class, 'export']);
+    Route::match(['GET', 'POST'], '/contacts/export', [ContactController::class, 'export']);
     Route::post('/contacts/import', [ContactController::class, 'import']);
     // If you want public template, move outside group; if protected, keep here.
     Route::get('/contacts/export-template', [ContactController::class, 'exportTemplate']);
@@ -71,12 +73,12 @@ Route::middleware(['auth:sanctum','verified'])->group(function () {
     Route::get('/reminders/{reminder}', [ReminderController::class, 'show'])->whereNumber('reminder');
     Route::patch('/reminders/{reminder}', [ReminderController::class, 'update'])->whereNumber('reminder');
     Route::delete('/reminders/{reminder}', [ReminderController::class, 'destroy'])->whereNumber('reminder');
-    
+
     // Add missing routes
     Route::post('/reminders/{reminder}/done', [ReminderController::class, 'markDone'])->whereNumber('reminder');
     Route::post('/reminders/{reminder}/contacts', [ReminderController::class, 'attachContacts'])->whereNumber('reminder');
     Route::delete('/reminders/{reminder}/contacts/{contact}', [ReminderController::class, 'detachContact'])->whereNumber('reminder')->whereNumber('contact');
-    
+
     Route::post('/reminders/bulk-status', [ReminderController::class, 'bulkStatus']);
     Route::post('/reminders/bulk-delete', [ReminderController::class, 'bulkDelete']);
     Route::get('/reminders/pivot', [ReminderController::class, 'pivotIndex']);
@@ -84,12 +86,27 @@ Route::middleware(['auth:sanctum','verified'])->group(function () {
     // Add route for reminders by contact
     Route::get('/contacts/{contact}/reminders', [ReminderController::class, 'byContact'])->whereNumber('contact');
 
-    Route::get   ('/notifications', [NotificationController::class, 'index']);
-Route::post  ('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->whereNumber('notification');
-Route::post  ('/notifications/{notification}/done', [NotificationController::class, 'markDone'])->whereNumber('notification');
-Route::post  ('/notifications/bulk-read', [NotificationController::class, 'bulkRead']);
-Route::delete('/notifications/{notification}', [NotificationController::class, 'destroy'])->whereNumber('notification');
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->whereNumber('notification');
+    Route::post('/notifications/{notification}/done', [NotificationController::class, 'markDone'])->whereNumber('notification');
+    Route::post('/notifications/bulk-read', [NotificationController::class, 'bulkRead']);
+    Route::delete('/notifications/{notification}', [NotificationController::class, 'destroy'])->whereNumber('notification');
 
+    // Company routes
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::apiResource('companies', App\Http\Controllers\CompanyController::class);
+        Route::apiResource('business-cards', App\Http\Controllers\BusinessCardController::class);
+    });
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('company', [App\Http\Controllers\CompanyController::class, 'show']);
+        Route::post('company', [App\Http\Controllers\CompanyController::class, 'store']);
+        Route::delete('company', [App\Http\Controllers\CompanyController::class, 'destroy']);
+
+        Route::get('business-card', [App\Http\Controllers\BusinessCardController::class, 'show']);
+        Route::post('business-card', [App\Http\Controllers\BusinessCardController::class, 'store']);
+        Route::delete('business-card', [App\Http\Controllers\BusinessCardController::class, 'destroy']);
+    });
 });
 
 // ✅ Handle OPTIONS preflight

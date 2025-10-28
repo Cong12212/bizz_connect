@@ -43,10 +43,22 @@ class User extends Authenticatable implements MustVerifyEmail
     // N-N via company_user pivot table (includes role + softDeletes)
     public function companies()
     {
-        return $this->belongsToMany(Company::class)
-            ->withPivot(['role', 'deleted_at'])
-            ->withTimestamps();
+        return $this->hasMany(Company::class);
+    }
+
+    public function businessCards()
+    {
+        return $this->hasMany(BusinessCard::class);
     }
 
     // 1-N: personal subscriptions (user_id
+    public function company()
+    {
+        return $this->hasOne(Company::class);
+    }
+
+    public function businessCard()
+    {
+        return $this->hasOne(BusinessCard::class);
+    }
 }
