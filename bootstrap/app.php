@@ -11,15 +11,14 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__ . '/../routes/web.php',
         api: __DIR__ . '/../routes/api.php',
-        apiPrefix: 'api',
         commands: __DIR__ . '/../routes/console.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-         $middleware->trustProxies(at: '*');
-
-        // ✅ Bật CORS toàn cục
-        $middleware->append(HandleCors::class);
+        // ✅ Thêm CORS middleware vào API
+        $middleware->api(prepend: [
+            \Illuminate\Http\Middleware\HandleCors::class,
+        ]);
 
         // Alias middleware cho API của bạn
         $middleware->alias([

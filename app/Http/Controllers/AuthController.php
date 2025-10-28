@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Auth\Events\Verified;
 use App\Notifications\PasswordResetCode;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use App\Models\User;
 
@@ -52,8 +53,11 @@ class AuthController extends Controller
             'password' => Hash::make($data['password']),
         ]);
 
-        try { $u->sendEmailVerificationNotification(); }
-        catch (\Throwable $e) { \Log::warning('Send verify email failed: '.$e->getMessage()); }
+        try {
+            $u->sendEmailVerificationNotification();
+        } catch (\Throwable $e) {
+            Log::warning('Send verify email failed: ' . $e->getMessage());
+        }
 
         return response()->json([
             'token'    => $u->createToken('api')->plainTextToken,
@@ -87,20 +91,20 @@ class AuthController extends Controller
      *     @OA\Response(response=401, description="Invalid credentials")
      * )
      */
-   public function login(Request $r)
-   {
-       $r->validate(['email' => 'required|email', 'password' => 'required']);
-       $u = User::where('email', $r->email)->first();
+    public function login(Request $r)
+    {
+        $r->validate(['email' => 'required|email', 'password' => 'required']);
+        $u = User::where('email', $r->email)->first();
 
-       if (!$u || !Hash::check($r->password, $u->password)) {
-           return response()->json(['message' => 'Invalid credentials'], 401);
-       }
+        if (!$u || !Hash::check($r->password, $u->password)) {
+            return response()->json(['message' => 'Invalid credentials'], 401);
+        }
 
-       return response()->json([
-           'token'    => $u->createToken('api')->plainTextToken,
-           'verified' => (bool) $u->hasVerifiedEmail(),
-           'user'     => $u, 
-       ]);
+        return response()->json([
+            'token'    => $u->createToken('api')->plainTextToken,
+            'verified' => (bool) $u->hasVerifiedEmail(),
+            'user'     => $u,
+        ]);
     }
 
     /**
@@ -117,7 +121,10 @@ class AuthController extends Controller
      *     @OA\Response(response=401, description="Unauthenticated")
      * )
      */
-    public function me(Request $r)      { return $r->user(); }
+    public function me(Request $r)
+    {
+        return $r->user();
+    }
 
     /**
      * @OA\Post(
@@ -128,7 +135,11 @@ class AuthController extends Controller
      *     @OA\Response(response=200, description="Logged out successfully")
      * )
      */
-    public function logout(Request $r)  { $r->user()->currentAccessToken()?->delete(); return ['ok'=>true]; }
+    public function logout(Request $r)
+    {
+        $r->user()->currentAccessToken()?->delete();
+        return ['ok' => true];
+    }
 
     /**
      * @OA\Post(
@@ -158,35 +169,35 @@ class AuthController extends Controller
      *     @OA\Response(response=302, description="Redirect to frontend")
      * )
      */
-  public function verifyEmail(Request $request, $id, $hash)
-{
-    // Validate signed URL
-    if (!$request->hasValidSignature()) {
+    public function verifyEmail(Request $request, $id, $hash)
+    {
+        // Validate signed URL
+        if (!$request->hasValidSignature()) {
+            $fe = config('app.frontend_url', 'http://localhost:5173');
+            return redirect()->away($fe . '/verify-error?reason=invalid_signature');
+        }
+
+        $user = \App\Models\User::findOrFail($id);
+
+        if (! hash_equals(sha1($user->getEmailForVerification()), (string) $hash)) {
+            $fe = config('app.frontend_url', 'http://localhost:5173');
+            return redirect()->away($fe . '/verify-error?reason=invalid_hash');
+        }
+
+        if (! $user->hasVerifiedEmail()) {
+            $user->markEmailAsVerified();
+            event(new \Illuminate\Auth\Events\Verified($user));
+        }
+
         $fe = config('app.frontend_url', 'http://localhost:5173');
-        return redirect()->away($fe.'/verify-error?reason=invalid_signature');
+        return redirect()->away($fe . '/verify-success?email=' . urlencode($user->email));
     }
-
-    $user = \App\Models\User::findOrFail($id);
-
-    if (! hash_equals(sha1($user->getEmailForVerification()), (string) $hash)) {
-        $fe = config('app.frontend_url', 'http://localhost:5173');
-        return redirect()->away($fe.'/verify-error?reason=invalid_hash');
-    }
-
-    if (! $user->hasVerifiedEmail()) {
-        $user->markEmailAsVerified();
-        event(new \Illuminate\Auth\Events\Verified($user));
-    }
-
-    $fe = config('app.frontend_url', 'http://localhost:5173');
-    return redirect()->away($fe.'/verify-success?email='.urlencode($user->email));
-}
 
     // Exchange magic code -> token (one-time use)
     public function magicExchange(Request $r)
     {
         $data = $r->validate(['code' => 'required|string']);
-        $cacheKey = 'magic:'.$data['code'];
+        $cacheKey = 'magic:' . $data['code'];
 
         $userId = Cache::pull($cacheKey); // get and delete -> one-time use only
         if (! $userId) {
@@ -233,7 +244,7 @@ class AuthController extends Controller
         $code = (string) random_int(100000, 999999); // 6 digits
         $ttl  = 10; // minutes
 
-        $cacheKey = 'pwreset:'.$user->id;
+        $cacheKey = 'pwreset:' . $user->id;
         Cache::put($cacheKey, [
             'code' => $code,
             'hash' => Hash::make($data['new_password']), // store HASH of new password
@@ -242,7 +253,7 @@ class AuthController extends Controller
         try {
             $user->notify(new PasswordResetCode($code, $ttl));
         } catch (\Throwable $e) {
-            \Log::warning('Send reset code failed: '.$e->getMessage());
+            Log::warning('Send reset code failed: ' . $e->getMessage());
         }
 
         return response()->json(['message' => 'Verification code sent if the email exists'], 200);
@@ -269,7 +280,7 @@ class AuthController extends Controller
         $user = User::where('email', $data['email'])->first();
         if (!$user) return response()->json(['message' => 'Verification code re-sent if the email exists'], 200);
 
-        $cacheKey = 'pwreset:'.$user->id;
+        $cacheKey = 'pwreset:' . $user->id;
         $payload = Cache::get($cacheKey);
         if (!$payload) return response()->json(['message' => 'No pending reset. Please start again.'], 400);
 
@@ -278,7 +289,10 @@ class AuthController extends Controller
         $payload['code'] = $code;
         Cache::put($cacheKey, $payload, now()->addMinutes(10));
 
-        try { $user->notify(new PasswordResetCode($code, 10)); } catch (\Throwable $e) {}
+        try {
+            $user->notify(new PasswordResetCode($code, 10));
+        } catch (\Throwable $e) {
+        }
         return response()->json(['message' => 'Verification code re-sent'], 200);
     }
 
@@ -307,7 +321,7 @@ class AuthController extends Controller
 
         $user = User::where('email', $data['email'])->firstOrFail();
 
-        $cacheKey = 'pwreset:'.$user->id;
+        $cacheKey = 'pwreset:' . $user->id;
         $payload  = Cache::get($cacheKey);
 
         if (!$payload) {
@@ -324,7 +338,10 @@ class AuthController extends Controller
 
         // Invalidate code + (recommended) revoke old tokens
         Cache::forget($cacheKey);
-        try { $user->tokens()->delete(); } catch (\Throwable $e) {}
+        try {
+            $user->tokens()->delete();
+        } catch (\Throwable $e) {
+        }
 
         return response()->json(['message' => 'Password has been reset. Please log in with your new password.'], 200);
     }
@@ -345,15 +362,16 @@ class AuthController extends Controller
      *     @OA\Response(response=200, description="User updated")
      * )
      */
-    public function updateMe(Request $r) {
-      $u = $r->user();
-      $data = $r->validate([
-        'name' => 'sometimes|string|max:100',
-        'email'=> 'sometimes|email|unique:users,email,'.$u->id,
-        'password' => 'sometimes|string|min:6',
-      ]);
-      if (isset($data['password'])) $data['password'] = \Hash::make($data['password']);
-      $u->fill($data)->save();
-      return $u;
+    public function updateMe(Request $r)
+    {
+        $u = $r->user();
+        $data = $r->validate([
+            'name' => 'sometimes|string|max:100',
+            'email' => 'sometimes|email|unique:users,email,' . $u->id,
+            'password' => 'sometimes|string|min:6',
+        ]);
+        if (isset($data['password'])) $data['password'] = Hash::make($data['password']);
+        $u->fill($data)->save();
+        return $u;
     }
 }

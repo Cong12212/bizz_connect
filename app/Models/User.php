@@ -19,8 +19,13 @@ class User extends Authenticatable implements MustVerifyEmail
      * then add them to fillable for convenient mass assignment.
      */
     protected $fillable = [
-        'name', 'email', 'password',
-        'phone', 'avatar_url', 'locale', 'timezone',
+        'name',
+        'email',
+        'password',
+        'phone',
+        'avatar_url',
+        'locale',
+        'timezone',
     ];
 
     protected $hidden = ['password', 'remember_token'];
@@ -32,7 +37,6 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * Expose 2 computed fields when serializing to JSON.
      */
-    protected $appends = ['is_plus', 'effective_plan'];
 
     /* ===================== Relationships ===================== */
 
@@ -44,54 +48,5 @@ class User extends Authenticatable implements MustVerifyEmail
             ->withTimestamps();
     }
 
-    // 1-N: personal subscriptions (user_id)
-    public function subscriptions()
-    {
-        return $this->hasMany(Subscription::class);
-    }
-
-    /* ===================== Accessors ===================== */
-
-    // Does user have Plus? (has active personal sub or belongs to company with active sub)
-    public function getIsPlusAttribute(): bool
-    {
-        // 1) Personal Plus
-        $hasPersonal = $this->subscriptions()
-            ->active()
-            ->whereIn('plan', ['pro', 'pro_plus'])
-            ->exists();
-        if ($hasPersonal) return true;
-
-        // 2) Company Plus (any company user belongs to)
-        $companyIds = $this->companies()->pluck('companies.id');
-        if ($companyIds->isEmpty()) return false;
-
-        return Subscription::active()
-            ->whereIn('company_id', $companyIds)
-            ->whereNull('user_id')
-            ->whereIn('plan', ['pro', 'pro_plus'])
-            ->exists();
-    }
-
-    // Effective plan inheritance: personal > company > free
-    public function getEffectivePlanAttribute(): string
-    {
-        $personal = $this->subscriptions()
-            ->active()
-            ->orderByDesc('current_period_end')
-            ->first();
-        if ($personal) return $personal->plan;
-
-        $companyIds = $this->companies()->pluck('companies.id');
-        if ($companyIds->isNotEmpty()) {
-            $companySub = Subscription::active()
-                ->whereIn('company_id', $companyIds)
-                ->whereNull('user_id')
-                ->orderByDesc('current_period_end')
-                ->first();
-            if ($companySub) return $companySub->plan;
-        }
-
-        return Plan::Free->value; // 'free'
-    }
+    // 1-N: personal subscriptions (user_id
 }
