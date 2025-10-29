@@ -16,10 +16,25 @@ class Contact extends Model
 
     protected $fillable = [
         'owner_user_id',
-        'name','company','email','phone',
-        'address','notes',
-        'job_title','linkedin_url','website_url',
-        'ocr_raw','duplicate_of_id','search_text','source',
+        'name',
+        'company',
+        'job_title',
+        'email',
+        'phone',
+        'address',
+        'address_line1',
+        'address_line2',
+        'city',
+        'state',
+        'country',
+        'postal_code',
+        'notes',
+        'linkedin_url',
+        'website_url',
+        'ocr_raw',
+        'duplicate_of_id',
+        'search_text',
+        'source',
     ];
 
     protected $casts = [
@@ -55,8 +70,8 @@ class Contact extends Model
             'contact_id',
             'reminder_id'
         )
-        ->withPivot(['is_primary'])
-        ->withTimestamps();
+            ->withPivot(['is_primary'])
+            ->withTimestamps();
     }
 
     /* ---------------------- Reusable Scopes ---------------------- */
@@ -73,21 +88,21 @@ class Contact extends Model
      *  - status: pending|done|... (optional)
      *  - after, before: ISO datetime or any parsable by Carbon (optional)
      */
-   public function scopeWithReminder(Builder $q, array $opt = []): Builder
-{
-    $status = $opt['status'] ?? null;
-    $after  = !empty($opt['after'])  ? Carbon::parse($opt['after'])  : null;
-    $before = !empty($opt['before']) ? Carbon::parse($opt['before']) : null;
+    public function scopeWithReminder(Builder $q, array $opt = []): Builder
+    {
+        $status = $opt['status'] ?? null;
+        $after  = !empty($opt['after'])  ? Carbon::parse($opt['after'])  : null;
+        $before = !empty($opt['before']) ? Carbon::parse($opt['before']) : null;
 
-    return $q->whereExists(function ($sub) use ($status, $after, $before) {
-        $sub->selectRaw(1)
-            ->from('contact_reminder as cr')
-            ->join('reminders as r', 'r.id', '=', 'cr.reminder_id')
-            ->whereColumn('cr.contact_id', 'contacts.id')
-            ->whereColumn('r.owner_user_id', 'contacts.owner_user_id')
-            ->when($status, fn($w) => $w->where('r.status', $status))
-            ->when($after,  fn($w) => $w->where('r.due_at', '>=', $after))
-            ->when($before, fn($w) => $w->where('r.due_at', '<=', $before));
-    });
-}
+        return $q->whereExists(function ($sub) use ($status, $after, $before) {
+            $sub->selectRaw(1)
+                ->from('contact_reminder as cr')
+                ->join('reminders as r', 'r.id', '=', 'cr.reminder_id')
+                ->whereColumn('cr.contact_id', 'contacts.id')
+                ->whereColumn('r.owner_user_id', 'contacts.owner_user_id')
+                ->when($status, fn($w) => $w->where('r.status', $status))
+                ->when($after,  fn($w) => $w->where('r.due_at', '>=', $after))
+                ->when($before, fn($w) => $w->where('r.due_at', '<=', $before));
+        });
+    }
 }

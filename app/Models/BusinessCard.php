@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 /**
  * @OA\Schema(
@@ -28,7 +29,10 @@ use Illuminate\Database\Eloquent\Model;
  *     @OA\Property(property="avatar", type="string"),
  *     @OA\Property(property="notes", type="string"),
  *     @OA\Property(property="created_at", type="string", format="date-time"),
- *     @OA\Property(property="updated_at", type="string", format="date-time")
+ *     @OA\Property(property="updated_at", type="string", format="date-time"),
+ *     @OA\Property(property="slug", type="string", example="john-doe-tech-corp"),
+ *     @OA\Property(property="is_public", type="boolean", example=true),
+ *     @OA\Property(property="view_count", type="integer", example=42)
  * )
  */
 class BusinessCard extends Model
@@ -38,6 +42,7 @@ class BusinessCard extends Model
     protected $fillable = [
         'user_id',
         'company_id',
+        'slug',
         'full_name',
         'job_title',
         'department',
@@ -46,12 +51,53 @@ class BusinessCard extends Model
         'mobile',
         'website',
         'address',
+        'address_line1',
+        'address_line2',
+        'city',
+        'state',
+        'country',
+        'postal_code',
         'linkedin',
         'facebook',
         'twitter',
         'avatar',
         'notes',
+        'is_public'
     ];
+
+    protected $casts = [
+        'is_public' => 'boolean',
+        'view_count' => 'integer',
+    ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($card) {
+            if (empty($card->slug)) {
+                $card->slug = static::generateUniqueSlug($card->full_name);
+            }
+        });
+
+        static::updating(function ($card) {
+            if ($card->isDirty('full_name') && empty($card->slug)) {
+                $card->slug = static::generateUniqueSlug($card->full_name);
+            }
+        });
+    }
+
+    protected static function generateUniqueSlug($name)
+    {
+        $slug = Str::slug($name);
+        $count = 1;
+
+        while (static::where('slug', $slug)->exists()) {
+            $slug = Str::slug($name) . '-' . $count++;
+        }
+
+        return $slug;
+    }
 
     public function user()
     {
@@ -61,5 +107,10 @@ class BusinessCard extends Model
     public function company()
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function getPublicUrlAttribute()
+    {
+        return config('app.frontend_url') . '/card/' . $this->slug;
     }
 }

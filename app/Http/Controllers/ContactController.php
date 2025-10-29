@@ -60,9 +60,9 @@ class ContactController extends Controller
             $term = "%{$textTerm}%";
             $q->where(function ($w) use ($term) {
                 $w->where('name', 'like', $term)
-                  ->orWhere('email', 'like', $term)
-                  ->orWhere('phone', 'like', $term)
-                  ->orWhere('company', 'like', $term);
+                    ->orWhere('email', 'like', $term)
+                    ->orWhere('phone', 'like', $term)
+                    ->orWhere('company', 'like', $term);
             });
         }
 
@@ -76,7 +76,7 @@ class ContactController extends Controller
         $tagNames = [];
         if ($p = $r->query('tags')) {
             $tagNames = is_array($p) ? $p : explode(',', (string)$p);
-            $tagNames = array_values(array_filter(array_map(fn($s)=>ltrim(trim($s),'#'), $tagNames)));
+            $tagNames = array_values(array_filter(array_map(fn($s) => ltrim(trim($s), '#'), $tagNames)));
         }
 
         if (!empty($hashTagNames)) {
@@ -167,9 +167,9 @@ class ContactController extends Controller
         // ===== Sort =====
         $sort = (string) $r->query('sort', '-id');
         $sort === 'name'   ? $q->orderBy('name')
-      : ($sort === '-name' ? $q->orderBy('name', 'desc')
-      : ($sort === 'id'    ? $q->orderBy('id')
-                           : $q->orderBy('id', 'desc')));
+            : ($sort === '-name' ? $q->orderBy('name', 'desc')
+                : ($sort === 'id'    ? $q->orderBy('id')
+                    : $q->orderBy('id', 'desc')));
 
         // eager-load tags
         $q->with(['tags' => fn($t) => $t->where('tags.owner_user_id', $r->user()->id)]);
@@ -219,13 +219,20 @@ class ContactController extends Controller
             'email'           => 'nullable|email|max:255',
             'phone'           => 'nullable|string|max:50',
             'address'         => 'nullable|string|max:255',
+            'address_line1'   => 'nullable|string|max:255',
+            'address_line2'   => 'nullable|string|max:255',
+            'city'            => 'nullable|string|max:255',
+            'state'           => 'nullable|string|max:255',
+            'country'         => 'nullable|string|max:255',
+            'postal_code'     => 'nullable|string|max:20',
             'notes'           => 'nullable|string',
             'linkedin_url'    => 'nullable|url|max:255',
             'website_url'     => 'nullable|url|max:255',
             'ocr_raw'         => 'nullable|string',
             'duplicate_of_id' => [
-                'nullable','integer',
-                Rule::exists('contacts','id')->where(fn($q) => $q->where('owner_user_id', $r->user()->id)),
+                'nullable',
+                'integer',
+                Rule::exists('contacts', 'id')->where(fn($q) => $q->where('owner_user_id', $r->user()->id)),
             ],
             'search_text'     => 'nullable|string',
             'source'          => 'nullable|string|max:50',
@@ -241,7 +248,7 @@ class ContactController extends Controller
         UserNotification::log($r->user()->id, [
             'type'        => 'contact.created',
             'title'       => 'New contact created',
-            'body'        => $c->name . ($c->company ? ' · '.$c->company : ''),
+            'body'        => $c->name . ($c->company ? ' · ' . $c->company : ''),
             'data'        => ['contact_id' => $c->id],
             'contact_id'  => $c->id,
         ]);
@@ -314,13 +321,22 @@ class ContactController extends Controller
             'email'           => 'sometimes|nullable|email|max:255',
             'phone'           => 'sometimes|nullable|string|max:50',
             'address'         => 'sometimes|nullable|string|max:255',
+            'address_line1'   => 'sometimes|nullable|string|max:255',
+            'address_line2'   => 'sometimes|nullable|string|max:255',
+            'city'            => 'sometimes|nullable|string|max:255',
+            'state'           => 'sometimes|nullable|string|max:255',
+            'country'         => 'sometimes|nullable|string|max:255',
+            'postal_code'     => 'sometimes|nullable|string|max:20',
             'notes'           => 'sometimes|nullable|string',
             'linkedin_url'    => 'sometimes|nullable|url|max:255',
             'website_url'     => 'sometimes|nullable|url|max:255',
             'ocr_raw'         => 'sometimes|nullable|string',
             'duplicate_of_id' => [
-                'sometimes','nullable','integer',
-                Rule::exists('contacts','id')->where(fn($q) =>
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('contacts', 'id')->where(
+                    fn($q) =>
                     $q->where('owner_user_id', $r->user()->id)
                 ),
                 Rule::notIn([$contact->id]),
@@ -331,7 +347,7 @@ class ContactController extends Controller
 
         // Prevent circular duplicate A↔B
         if (!empty($payload['duplicate_of_id'])) {
-            $target = Contact::select('id','duplicate_of_id')
+            $target = Contact::select('id', 'duplicate_of_id')
                 ->where('owner_user_id', $r->user()->id)
                 ->find($payload['duplicate_of_id']);
             if ($target && (int) $target->duplicate_of_id === (int) $contact->id) {
@@ -513,9 +529,9 @@ class ContactController extends Controller
             $term = "%{$textTerm}%";
             $query->where(function ($w) use ($term) {
                 $w->where('name', 'like', $term)
-                  ->orWhere('email', 'like', $term)
-                  ->orWhere('phone', 'like', $term)
-                  ->orWhere('company', 'like', $term);
+                    ->orWhere('email', 'like', $term)
+                    ->orWhere('phone', 'like', $term)
+                    ->orWhere('company', 'like', $term);
             });
         }
 
@@ -529,7 +545,7 @@ class ContactController extends Controller
         $tagNames = [];
         if ($p = $r->query('tags')) {
             $tagNames = is_array($p) ? $p : explode(',', (string)$p);
-            $tagNames = array_values(array_filter(array_map(fn($s)=>ltrim(trim($s),'#'), $tagNames)));
+            $tagNames = array_values(array_filter(array_map(fn($s) => ltrim(trim($s), '#'), $tagNames)));
         }
 
         if (!empty($hashTagNames)) {
@@ -615,15 +631,15 @@ class ContactController extends Controller
         // sort
         $sort = (string)$r->query('sort', '-id');
         $sort === 'name'   ? $query->orderBy('name')
-      : ($sort === '-name' ? $query->orderBy('name', 'desc')
-      : ($sort === 'id'    ? $query->orderBy('id')
-                           : $query->orderBy('id', 'desc')));
+            : ($sort === '-name' ? $query->orderBy('name', 'desc')
+                : ($sort === 'id'    ? $query->orderBy('id')
+                    : $query->orderBy('id', 'desc')));
 
         $contacts = $query->get();
 
         $export  = new ContactsExport($contacts);
         $format  = strtolower((string)$r->query('format', 'xlsx'));
-        $file    = 'contacts_'.now()->format('Ymd_His').'.'.$format;
+        $file    = 'contacts_' . now()->format('Ymd_His') . '.' . $format;
 
         return $format === 'csv'
             ? Excel::download($export, $file, \Maatwebsite\Excel\Excel::CSV)
@@ -699,8 +715,8 @@ class ContactController extends Controller
     public function bulkDelete(Request $r)
     {
         $uid = $r->user()->id;
-        $data = $r->validate(['ids'=>['required','array','min:1'],'ids.*'=>'integer']);
-        $count = Contact::where('owner_user_id',$uid)->whereIn('id',$data['ids'])->delete();
-        return response()->json(['deleted'=>$count]);
+        $data = $r->validate(['ids' => ['required', 'array', 'min:1'], 'ids.*' => 'integer']);
+        $count = Contact::where('owner_user_id', $uid)->whereIn('id', $data['ids'])->delete();
+        return response()->json(['deleted' => $count]);
     }
 }

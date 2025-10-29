@@ -8,9 +8,14 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Drop nếu tồn tại rồi
+        Schema::dropIfExists('business_cards');
+
+        // Tạo mới
         Schema::create('business_cards', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->string('slug')->unique()->nullable();
+            $table->foreignId('user_id')->unique()->constrained()->onDelete('cascade');
             $table->foreignId('company_id')->nullable()->constrained()->onDelete('set null');
             $table->string('full_name');
             $table->string('job_title')->nullable();
@@ -25,6 +30,8 @@ return new class extends Migration
             $table->string('twitter')->nullable();
             $table->string('avatar')->nullable();
             $table->text('notes')->nullable();
+            $table->boolean('is_public')->default(true);
+            $table->integer('view_count')->default(0);
             $table->timestamps();
             $table->index(['user_id', 'company_id', 'email']);
         });

@@ -98,6 +98,9 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
         Route::apiResource('business-cards', App\Http\Controllers\BusinessCardController::class);
     });
 
+    // Public business card routes (no auth required)
+    Route::get('business-card/public/{slug}', [App\Http\Controllers\BusinessCardController::class, 'showPublic']);
+
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('company', [App\Http\Controllers\CompanyController::class, 'show']);
         Route::post('company', [App\Http\Controllers\CompanyController::class, 'store']);
@@ -106,6 +109,7 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
         Route::get('business-card', [App\Http\Controllers\BusinessCardController::class, 'show']);
         Route::post('business-card', [App\Http\Controllers\BusinessCardController::class, 'store']);
         Route::delete('business-card', [App\Http\Controllers\BusinessCardController::class, 'destroy']);
+        Route::post('business-card/connect/{slug}', [App\Http\Controllers\BusinessCardController::class, 'connect']);
     });
 });
 

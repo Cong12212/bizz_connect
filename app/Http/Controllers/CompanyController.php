@@ -50,8 +50,12 @@ class CompanyController extends Controller
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:50',
             'address' => 'nullable|string',
+            'address_line1' => 'nullable|string|max:255',
+            'address_line2' => 'nullable|string|max:255',
             'city' => 'nullable|string|max:255',
+            'state' => 'nullable|string|max:255',
             'country' => 'nullable|string|max:255',
+            'postal_code' => 'nullable|string|max:20',
             'logo' => 'nullable|image|max:2048',
         ]);
 
@@ -98,5 +102,54 @@ class CompanyController extends Controller
 
         $company->delete();
         return response()->json(['message' => 'Company deleted']);
+    }
+
+    /**
+     * @OA\Put(
+     *     path="/api/company/{id}",
+     *     tags={"Company"},
+     *     summary="Update user's company",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"name"},
+     *             @OA\Property(property="name", type="string")
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Company updated")
+     * )
+     */
+    public function update(Request $request, $id)
+    {
+        $company = Company::where('user_id', $request->user()->id)->findOrFail($id);
+
+        $data = $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'domain' => 'nullable|string|max:255',
+            'industry' => 'nullable|string|max:255',
+            'description' => 'nullable|string',
+            'website' => 'nullable|url|max:255',
+            'email' => 'nullable|email|max:255',
+            'phone' => 'nullable|string|max:50',
+            'address' => 'nullable|string',
+            'address_line1' => 'nullable|string|max:255',
+            'address_line2' => 'nullable|string|max:255',
+            'city' => 'nullable|string|max:255',
+            'state' => 'nullable|string|max:255',
+            'country' => 'nullable|string|max:255',
+            'postal_code' => 'nullable|string|max:20',
+            'logo' => 'nullable|image|max:2048',
+        ]);
+
+        if ($request->hasFile('logo')) {
+            $data['logo'] = $request->file('logo')->store('logos', 'public');
+        }
+
+        $data['user_id'] = $request->user()->id;
+
+        $company->update($data);
+
+        return response()->json($company);
     }
 }

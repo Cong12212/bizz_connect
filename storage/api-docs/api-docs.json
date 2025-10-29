@@ -387,26 +387,16 @@
                 }
             }
         },
-        "/api/business-cards": {
+        "/api/business-card": {
             "get": {
                 "tags": [
                     "Business Card"
                 ],
-                "summary": "Get all business cards",
-                "operationId": "b2cfeba716a83ef57680d420f1206157",
+                "summary": "Get user's business card",
+                "operationId": "67f688541c1600cd229dcddd4fe58b88",
                 "responses": {
                     "200": {
-                        "description": "List of business cards",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/BusinessCard"
-                                    }
-                                }
-                            }
-                        }
+                        "description": "Business card details"
                     }
                 },
                 "security": [
@@ -419,112 +409,11 @@
                 "tags": [
                     "Business Card"
                 ],
-                "summary": "Create a business card",
-                "operationId": "0adb369481048e09a76d1e31c48885b3",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "full_name",
-                                    "email"
-                                ],
-                                "properties": {
-                                    "company_id": {
-                                        "type": "integer"
-                                    },
-                                    "full_name": {
-                                        "type": "string"
-                                    },
-                                    "job_title": {
-                                        "type": "string"
-                                    },
-                                    "email": {
-                                        "type": "string"
-                                    },
-                                    "phone": {
-                                        "type": "string"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Business card created"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/business-cards/{id}": {
-            "get": {
-                "tags": [
-                    "Business Card"
-                ],
-                "summary": "Get a business card",
-                "operationId": "d0bb3768ccd556ec912df5dddf55bf93",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
+                "summary": "Create or update user's business card",
+                "operationId": "bed02efc9904213df799e9c343ac1b4a",
                 "responses": {
                     "200": {
-                        "description": "Business card details"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "put": {
-                "tags": [
-                    "Business Card"
-                ],
-                "summary": "Update a business card",
-                "operationId": "087029dd4ac05813335eb147cfc21800",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "properties": {
-                                    "full_name": {
-                                        "type": "string"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Business card updated"
+                        "description": "Business card saved"
                     }
                 },
                 "security": [
@@ -537,18 +426,8 @@
                 "tags": [
                     "Business Card"
                 ],
-                "summary": "Delete a business card",
-                "operationId": "d97c342d27e111087f599fc401cd0895",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
+                "summary": "Delete user's business card",
+                "operationId": "55965ef9bedeb514d36756f52c30de0c",
                 "responses": {
                     "200": {
                         "description": "Deleted"
@@ -561,26 +440,69 @@
                 ]
             }
         },
-        "/api/companies": {
+        "/api/business-card/public/{slug}": {
+            "get": {
+                "tags": [
+                    "Business Card"
+                ],
+                "summary": "Get public business card by slug",
+                "operationId": "3d9d03b719fb2bb107264e16a9d35a6c",
+                "parameters": [
+                    {
+                        "name": "slug",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Public business card"
+                    }
+                }
+            }
+        },
+        "/api/business-card/connect/{slug}": {
+            "post": {
+                "tags": [
+                    "Business Card"
+                ],
+                "summary": "Connect with business card owner",
+                "operationId": "ed410c8f3c6c0faba806c75beec14819",
+                "parameters": [
+                    {
+                        "name": "slug",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Connection created"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/company": {
             "get": {
                 "tags": [
                     "Company"
                 ],
-                "summary": "Get all companies for authenticated user",
-                "operationId": "54f966c056050f9db4fff6ee5a45a76a",
+                "summary": "Get user's company",
+                "operationId": "2f0dc321dc73eb84c8832e8aa4152c8f",
                 "responses": {
                     "200": {
-                        "description": "List of companies",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/Company"
-                                    }
-                                }
-                            }
-                        }
+                        "description": "Company details"
                     }
                 },
                 "security": [
@@ -593,8 +515,8 @@
                 "tags": [
                     "Company"
                 ],
-                "summary": "Create a new company",
-                "operationId": "00e2db7b0f71c32b377f4dfc4dd685a8",
+                "summary": "Create or update user's company",
+                "operationId": "faf1545d2af89079ca55c4f9ed6ea302",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -605,110 +527,6 @@
                                 ],
                                 "properties": {
                                     "name": {
-                                        "type": "string",
-                                        "example": "Tech Corp"
-                                    },
-                                    "domain": {
-                                        "type": "string",
-                                        "example": "techcorp.com"
-                                    },
-                                    "industry": {
-                                        "type": "string",
-                                        "example": "Technology"
-                                    },
-                                    "description": {
-                                        "type": "string"
-                                    },
-                                    "website": {
-                                        "type": "string"
-                                    },
-                                    "email": {
-                                        "type": "string"
-                                    },
-                                    "phone": {
-                                        "type": "string"
-                                    },
-                                    "address": {
-                                        "type": "string"
-                                    },
-                                    "city": {
-                                        "type": "string"
-                                    },
-                                    "country": {
-                                        "type": "string"
-                                    },
-                                    "logo": {
-                                        "type": "string",
-                                        "format": "binary"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Company created"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/companies/{id}": {
-            "get": {
-                "tags": [
-                    "Company"
-                ],
-                "summary": "Get a company",
-                "operationId": "01c261c039e4b27beeb888ef46bd86db",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Company details"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "put": {
-                "tags": [
-                    "Company"
-                ],
-                "summary": "Update a company",
-                "operationId": "6a1d7a4a2b9cbdfe7749cef78e6cec57",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "properties": {
-                                    "name": {
                                         "type": "string"
                                     }
                                 },
@@ -719,7 +537,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Company updated"
+                        "description": "Company saved"
                     }
                 },
                 "security": [
@@ -732,18 +550,8 @@
                 "tags": [
                     "Company"
                 ],
-                "summary": "Delete a company",
-                "operationId": "49d767f608bffc95ad39368bf1766693",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
+                "summary": "Delete user's company",
+                "operationId": "8f28fbfe903d3ab1c83e01172b499d5f",
                 "responses": {
                     "200": {
                         "description": "Company deleted"
@@ -3148,6 +2956,18 @@
                     "updated_at": {
                         "type": "string",
                         "format": "date-time"
+                    },
+                    "slug": {
+                        "type": "string",
+                        "example": "john-doe-tech-corp"
+                    },
+                    "is_public": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "view_count": {
+                        "type": "integer",
+                        "example": 42
                     }
                 },
                 "type": "object"
