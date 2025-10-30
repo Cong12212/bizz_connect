@@ -21,13 +21,7 @@ class Contact extends Model
         'job_title',
         'email',
         'phone',
-        'address',
-        'address_line1',
-        'address_line2',
-        'city',
-        'state',
-        'country',
-        'postal_code',
+        'address_id',
         'notes',
         'linkedin_url',
         'website_url',
@@ -72,6 +66,20 @@ class Contact extends Model
         )
             ->withPivot(['is_primary'])
             ->withTimestamps();
+    }
+
+    public function addresses()
+    {
+        return $this->belongsToMany(Address::class, 'contact_addresses')
+            ->withPivot('address_type_code', 'date_from', 'date_to')
+            ->withTimestamps();
+    }
+
+    public function getAddressByType($type = 'home')
+    {
+        return $this->addresses()
+            ->wherePivot('address_type_code', $type)
+            ->first();
     }
 
     /* ---------------------- Reusable Scopes ---------------------- */

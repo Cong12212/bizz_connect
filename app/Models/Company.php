@@ -44,13 +44,7 @@ class Company extends Model
         'website',
         'email',
         'phone',
-        'address',
-        'address_line1',
-        'address_line2',
-        'city',
-        'state',
-        'country',
-        'postal_code',
+        'address_id',
         'logo',
         'plan',
         'status',
@@ -64,5 +58,22 @@ class Company extends Model
     public function businessCard()
     {
         return $this->hasOne(BusinessCard::class);
+    }
+
+    public function addresses()
+    {
+        return $this->belongsToMany(Address::class, 'company_addresses')->withTimestamps();
+    }
+
+    public function getAddressByType($type = 'business')
+    {
+        return $this->addresses()
+            ->wherePivot('address_type_code', $type)
+            ->first();
+    }
+
+    public function address()
+    {
+        return $this->belongsTo(Address::class);
     }
 }

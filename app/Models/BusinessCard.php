@@ -50,13 +50,7 @@ class BusinessCard extends Model
         'phone',
         'mobile',
         'website',
-        'address',
-        'address_line1',
-        'address_line2',
-        'city',
-        'state',
-        'country',
-        'postal_code',
+        'address_id',
         'linkedin',
         'facebook',
         'twitter',
@@ -112,5 +106,22 @@ class BusinessCard extends Model
     public function getPublicUrlAttribute()
     {
         return config('app.frontend_url') . '/card/' . $this->slug;
+    }
+
+    public function addresses()
+    {
+        return $this->belongsToMany(Address::class, 'business_card_addresses')->withTimestamps();
+    }
+
+    public function getAddressByType($type = 'work')
+    {
+        return $this->addresses()
+            ->wherePivot('address_type_code', $type)
+            ->first();
+    }
+
+    public function address()
+    {
+        return $this->belongsTo(Address::class);
     }
 }

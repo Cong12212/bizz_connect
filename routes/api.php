@@ -11,6 +11,7 @@ use App\Http\Controllers\ReminderController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\BusinessCardController;
+use App\Http\Controllers\LocationController;
 
 /**
  * AUTH (public)
@@ -111,6 +112,11 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
         Route::delete('business-card', [App\Http\Controllers\BusinessCardController::class, 'destroy']);
         Route::post('business-card/connect/{slug}', [App\Http\Controllers\BusinessCardController::class, 'connect']);
     });
+
+    // Public location routes (no auth required)
+    Route::get('countries', [App\Http\Controllers\LocationController::class, 'countries']);
+    Route::get('countries/{code}/states', [App\Http\Controllers\LocationController::class, 'states']);
+    Route::get('states/{code}/cities', [App\Http\Controllers\LocationController::class, 'cities']);
 });
 
 // ✅ Handle OPTIONS preflight

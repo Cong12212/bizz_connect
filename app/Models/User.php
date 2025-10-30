@@ -61,4 +61,21 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasOne(BusinessCard::class);
     }
+
+    public function addresses()
+    {
+        return $this->belongsToMany(Address::class, 'user_addresses')->withTimestamps();
+    }
+
+    public function getAddressByType($type = 'home')
+    {
+        return $this->addresses()
+            ->wherePivot('address_type_code', $type)
+            ->first();
+    }
+
+    public function address()
+    {
+        return $this->belongsTo(Address::class);
+    }
 }

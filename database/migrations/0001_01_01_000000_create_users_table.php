@@ -4,8 +4,10 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
-  public function up(): void {
+return new class extends Migration
+{
+  public function up(): void
+  {
     Schema::create('users', function (Blueprint $t) {
       $t->id();
       $t->string('name');
@@ -16,11 +18,17 @@ return new class extends Migration {
       $t->string('avatar_url')->nullable();
       $t->string('locale')->nullable();
       $t->string('timezone')->nullable();
+      $t->unsignedBigInteger('company_id')->nullable();
+      $t->unsignedBigInteger('business_card_id')->nullable();
       $t->rememberToken();
       $t->timestamps();
       $t->softDeletes();
       $t->index('email');
     });
   }
-  public function down(): void { Schema::dropIfExists('users'); }
+
+  public function down(): void
+  {
+    Schema::dropIfExists('users');
+  }
 };
