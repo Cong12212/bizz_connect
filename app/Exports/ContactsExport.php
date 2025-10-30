@@ -2,18 +2,16 @@
 
 namespace App\Exports;
 
-use Illuminate\Support\Collection;
+use App\Models\Contact;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
-use Rap2hpoutre\FastExcel\FastExcel;
 
 class ContactsExport implements FromCollection, WithHeadings, WithMapping
 {
-    /** @var \Illuminate\Support\Collection */
-    protected Collection $contacts;
+    protected $contacts;
 
-    public function __construct(Collection $contacts)
+    public function __construct($contacts)
     {
         $this->contacts = $contacts;
     }
@@ -26,44 +24,44 @@ class ContactsExport implements FromCollection, WithHeadings, WithMapping
     public function headings(): array
     {
         return [
-            'id',
-            'name',
-            'company',
-            'job_title',
-            'email',
-            'phone',
-            'address',
-            'notes',
-            'tags',             // comma-separated tag names
-            'linkedin_url',
-            'website_url',
-            'duplicate_of_id',
-            'source',
-            'created_at',
-            'updated_at',
+            'ID',
+            'Name',
+            'Company',
+            'Job Title',
+            'Email',
+            'Phone',
+            'Address Detail',
+            'City',
+            'State/Province',
+            'Country',
+            'Notes',
+            'LinkedIn URL',
+            'Website URL',
+            'Tags',
+            'Source',
+            'Created At',
         ];
     }
 
-    public function map($c): array
+    public function map($contact): array
     {
-        $tags = $c->relationLoaded('tags') ? $c->tags->pluck('name')->implode(',') : '';
-
         return [
-            $c->id,
-            $c->name,
-            $c->company,
-            $c->job_title,
-            $c->email,
-            $c->phone,
-            $c->address,
-            $c->notes,
-            $tags,
-            $c->linkedin_url,
-            $c->website_url,
-            $c->duplicate_of_id,
-            $c->source,
-            optional($c->created_at)->toDateTimeString(),
-            optional($c->updated_at)->toDateTimeString(),
+            $contact->id,
+            $contact->name,
+            $contact->company,
+            $contact->job_title,
+            $contact->email,
+            $contact->phone,
+            $contact->address->address_detail ?? '',
+            $contact->address->city->name ?? '',
+            $contact->address->state->name ?? '',
+            $contact->address->country->name ?? '',
+            $contact->notes,
+            $contact->linkedin_url,
+            $contact->website_url,
+            $contact->tags->pluck('name')->map(fn($n) => "#{$n}")->join(', '),
+            $contact->source,
+            $contact->created_at?->format('Y-m-d H:i:s'),
         ];
     }
 }

@@ -6,49 +6,38 @@ use Illuminate\Database\Eloquent\Model;
 
 class Address extends Model
 {
-    protected $fillable = ['line1', 'line2', 'city', 'state', 'country'];
+    protected $fillable = ['address_detail', 'city_id', 'state_id', 'country_id'];
 
-    public function users()
-    {
-        return $this->hasMany(User::class);
-    }
-
-    public function businessCards()
-    {
-        return $this->hasMany(BusinessCard::class);
-    }
-
-    public function companies()
-    {
-        return $this->hasMany(Company::class);
-    }
+    protected $appends = ['full_address'];
 
     public function contacts()
     {
         return $this->hasMany(Contact::class);
     }
 
+    public function city()
+    {
+        return $this->belongsTo(City::class);
+    }
+
+    public function state()
+    {
+        return $this->belongsTo(State::class);
+    }
+
+    public function country()
+    {
+        return $this->belongsTo(Country::class);
+    }
+
     public function getFullAddressAttribute()
     {
-        $parts = array_filter([$this->line1, $this->line2]);
+        $parts = array_filter([
+            $this->address_detail,
+            $this->city?->name,
+            $this->state?->name,
+            $this->country?->name
+        ]);
         return implode(', ', $parts);
-    }
-
-    public function getCityNameAttribute()
-    {
-        $city = City::where('code', $this->city)->first();
-        return $city ? $city->name : $this->city;
-    }
-
-    public function getStateNameAttribute()
-    {
-        $state = State::where('code', $this->state)->first();
-        return $state ? $state->name : $this->state;
-    }
-
-    public function getCountryNameAttribute()
-    {
-        $country = Country::where('code', $this->country)->first();
-        return $country ? $country->name : $this->country;
     }
 }

@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Contact;
+use App\Models\Address;
 use App\Models\Tag;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\ContactsExport;
@@ -171,8 +173,13 @@ class ContactController extends Controller
                 : ($sort === 'id'    ? $q->orderBy('id')
                     : $q->orderBy('id', 'desc')));
 
-        // eager-load tags
-        $q->with(['tags' => fn($t) => $t->where('tags.owner_user_id', $r->user()->id)]);
+        // eager-load tags and address with relations
+        $q->with([
+            'tags' => fn($t) => $t->where('tags.owner_user_id', $r->user()->id),
+            'address.city',
+            'address.state',
+            'address.country'
+        ]);
 
         return $q->paginate($per);
     }
@@ -210,44 +217,70 @@ class ContactController extends Controller
      *     @OA\Response(response=422, description="Validation error")
      * )
      */
-    public function store(Request $r)
+    public function store(Request $request)
     {
-        $data = $r->validate([
+        $data = $request->validate([
             'name' => 'required|string|max:255',
             'company' => 'nullable|string|max:255',
             'job_title' => 'nullable|string|max:255',
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:50',
-            'address_line1' => 'nullable|string|max:255',
-            'address_line2' => 'nullable|string|max:255',
-            'city' => 'nullable|string|max:100',
-            'state' => 'nullable|string|max:100',
-            'country' => 'nullable|string|max:2',
+            'address_detail' => 'nullable|string|max:255',
+            'city' => 'nullable|string|max:20',
+            'state' => 'nullable|string|max:20',
+            'country' => 'nullable|string|max:10',
             'notes' => 'nullable|string',
             'linkedin_url' => 'nullable|url|max:255',
             'website_url' => 'nullable|url|max:255',
             'ocr_raw' => 'nullable|string',
-            'duplicate_of_id' => ['nullable', 'integer', Rule::exists('contacts', 'id')->where(fn($q) => $q->where('owner_user_id', $r->user()->id))],
+            'duplicate_of_id' => ['nullable', 'integer', Rule::exists('contacts', 'id')->where(fn($q) => $q->where('owner_user_id', $request->user()->id))],
             'search_text' => 'nullable|string',
             'source' => 'nullable|string|max:50',
         ]);
 
-        $data['owner_user_id'] = $r->user()->id;
-        if (!isset($data['source']) || $data['source'] === null || $data['source'] === '') {
-            $data['source'] = 'manual';
+        // Tạo address nếu có thông tin
+        $addressId = null;
+        if ($request->filled('address_detail') || $request->filled('city')) {
+            // Lấy ID từ code
+            $cityId = $request->city ? DB::table('cities')->where('code', $request->city)->value('id') : null;
+            $stateId = $request->state ? DB::table('states')->where('code', $request->state)->value('id') : null;
+            $countryId = $request->country ? DB::table('countries')->where('code', $request->country)->value('id') : null;
+
+            $address = Address::create([
+                'address_detail' => $request->address_detail,
+                'city_id' => $cityId,
+                'state_id' => $stateId,
+                'country_id' => $countryId,
+            ]);
+            $addressId = $address->id;
         }
 
-        $c = Contact::create($data);
-
-        UserNotification::log($r->user()->id, [
-            'type'        => 'contact.created',
-            'title'       => 'New contact created',
-            'body'        => $c->name . ($c->company ? ' · ' . $c->company : ''),
-            'data'        => ['contact_id' => $c->id],
-            'contact_id'  => $c->id,
+        $contact = Contact::create([
+            'owner_user_id' => $request->user()->id,
+            'name' => $data['name'],
+            'company' => $data['company'] ?? null,
+            'job_title' => $data['job_title'] ?? null,
+            'email' => $data['email'] ?? null,
+            'phone' => $data['phone'] ?? null,
+            'address_id' => $addressId,
+            'notes' => $data['notes'] ?? null,
+            'linkedin_url' => $data['linkedin_url'] ?? null,
+            'website_url' => $data['website_url'] ?? null,
+            'ocr_raw' => $data['ocr_raw'] ?? null,
+            'duplicate_of_id' => $data['duplicate_of_id'] ?? null,
+            'search_text' => $data['search_text'] ?? null,
+            'source' => $data['source'] ?? 'manual',
         ]);
 
-        return response()->json(['data' => $c->load('tags')], 201);
+        UserNotification::log($request->user()->id, [
+            'type'        => 'contact.created',
+            'title'       => 'New contact created',
+            'body'        => $contact->name . ($contact->company ? ' · ' . $contact->company : ''),
+            'data'        => ['contact_id' => $contact->id],
+            'contact_id'  => $contact->id,
+        ]);
+
+        return response()->json(['data' => $contact->load(['tags', 'address.city', 'address.state', 'address.country'])], 201);
     }
 
     /**
@@ -270,7 +303,7 @@ class ContactController extends Controller
     {
         $this->authorizeOwner($r, $contact);
         $uid = $r->user()->id;
-        $contact->load(['tags' => fn($t) => $t->where('tags.owner_user_id', $uid)]);
+        $contact->load(['tags' => fn($t) => $t->where('tags.owner_user_id', $uid), 'address']);
         return ['data' => $contact];
     }
 
@@ -304,23 +337,20 @@ class ContactController extends Controller
      *     @OA\Response(response=422, description="Validation error or circular duplicate")
      * )
      */
-    public function update(Request $r, Contact $contact)
+    public function update(Request $request, Contact $contact)
     {
-        $this->authorizeOwner($r, $contact);
+        $this->authorizeOwner($request, $contact);
 
-        $payload = $r->validate([
+        $payload = $request->validate([
             'name'            => 'sometimes|required|string|max:255',
             'company'         => 'sometimes|nullable|string|max:255',
             'job_title'       => 'sometimes|nullable|string|max:255',
             'email'           => 'sometimes|nullable|email|max:255',
             'phone'           => 'sometimes|nullable|string|max:50',
-            'address'         => 'sometimes|nullable|string|max:255',
-            'address_line1'   => 'sometimes|nullable|string|max:255',
-            'address_line2'   => 'sometimes|nullable|string|max:255',
-            'city'            => 'sometimes|nullable|string|max:255',
-            'state'           => 'sometimes|nullable|string|max:255',
-            'country'         => 'sometimes|nullable|string|max:255',
-            'postal_code'     => 'sometimes|nullable|string|max:20',
+            'address_detail'  => 'sometimes|nullable|string|max:255',
+            'city'            => 'sometimes|nullable|string|max:20',
+            'state'           => 'sometimes|nullable|string|max:20',
+            'country'         => 'sometimes|nullable|string|max:10',
             'notes'           => 'sometimes|nullable|string',
             'linkedin_url'    => 'sometimes|nullable|url|max:255',
             'website_url'     => 'sometimes|nullable|url|max:255',
@@ -330,8 +360,7 @@ class ContactController extends Controller
                 'nullable',
                 'integer',
                 Rule::exists('contacts', 'id')->where(
-                    fn($q) =>
-                    $q->where('owner_user_id', $r->user()->id)
+                    fn($q) => $q->where('owner_user_id', $request->user()->id)
                 ),
                 Rule::notIn([$contact->id]),
             ],
@@ -342,16 +371,51 @@ class ContactController extends Controller
         // Prevent circular duplicate A↔B
         if (!empty($payload['duplicate_of_id'])) {
             $target = Contact::select('id', 'duplicate_of_id')
-                ->where('owner_user_id', $r->user()->id)
+                ->where('owner_user_id', $request->user()->id)
                 ->find($payload['duplicate_of_id']);
             if ($target && (int) $target->duplicate_of_id === (int) $contact->id) {
                 return response()->json(['message' => 'Circular duplicate link (A↔B) is not allowed'], 422);
             }
         }
 
-        $contact->fill($payload)->save();
+        // Xử lý address
+        if ($request->hasAny(['address_detail', 'city', 'state', 'country'])) {
+            // Lấy ID từ code
+            $cityId = $request->city ? DB::table('cities')->where('code', $request->city)->value('id') : null;
+            $stateId = $request->state ? DB::table('states')->where('code', $request->state)->value('id') : null;
+            $countryId = $request->country ? DB::table('countries')->where('code', $request->country)->value('id') : null;
 
-        return ['data' => $contact->fresh()->load('tags')];
+            if ($contact->address_id) {
+                // Cập nhật address hiện tại
+                $existingAddress = Address::find($contact->address_id);
+                if ($existingAddress) {
+                    $existingAddress->update([
+                        'address_detail' => $request->input('address_detail', $existingAddress->address_detail),
+                        'city_id' => $cityId ?? $existingAddress->city_id,
+                        'state_id' => $stateId ?? $existingAddress->state_id,
+                        'country_id' => $countryId ?? $existingAddress->country_id,
+                    ]);
+                }
+            } else {
+                // Tạo address mới nếu có ít nhất address_detail hoặc city
+                if ($request->filled('address_detail') || $request->filled('city')) {
+                    $newAddress = Address::create([
+                        'address_detail' => $request->address_detail,
+                        'city_id' => $cityId,
+                        'state_id' => $stateId,
+                        'country_id' => $countryId,
+                    ]);
+                    $payload['address_id'] = $newAddress->id;
+                }
+            }
+        }
+
+        // Loại bỏ các field address khỏi payload
+        unset($payload['address_detail'], $payload['city'], $payload['state'], $payload['country']);
+
+        $contact->update($payload);
+
+        return ['data' => $contact->fresh()->load(['tags', 'address.city', 'address.state', 'address.country'])];
     }
 
     /**
@@ -712,5 +776,26 @@ class ContactController extends Controller
         $data = $r->validate(['ids' => ['required', 'array', 'min:1'], 'ids.*' => 'integer']);
         $count = Contact::where('owner_user_id', $uid)->whereIn('id', $data['ids'])->delete();
         return response()->json(['deleted' => $count]);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/contacts/export-template",
+     *     tags={"Contacts"},
+     *     summary="Download import template",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="format", in="query", description="Format", @OA\Schema(type="string", enum={"xlsx", "csv"}, default="xlsx")),
+     *     @OA\Response(response=200, description="Template file download")
+     * )
+     */
+    public function exportTemplate(Request $r)
+    {
+        $export = new ContactsTemplateExport();
+        $format = strtolower((string)$r->query('format', 'xlsx'));
+        $file = 'contacts_template.' . $format;
+
+        return $format === 'csv'
+            ? Excel::download($export, $file, \Maatwebsite\Excel\Excel::CSV)
+            : Excel::download($export, $file, \Maatwebsite\Excel\Excel::XLSX);
     }
 }

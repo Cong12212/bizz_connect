@@ -68,18 +68,9 @@ class Contact extends Model
             ->withTimestamps();
     }
 
-    public function addresses()
+    public function address(): BelongsTo
     {
-        return $this->belongsToMany(Address::class, 'contact_addresses')
-            ->withPivot('address_type_code', 'date_from', 'date_to')
-            ->withTimestamps();
-    }
-
-    public function getAddressByType($type = 'home')
-    {
-        return $this->addresses()
-            ->wherePivot('address_type_code', $type)
-            ->first();
+        return $this->belongsTo(Address::class);
     }
 
     /* ---------------------- Reusable Scopes ---------------------- */

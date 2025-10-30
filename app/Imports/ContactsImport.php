@@ -3,115 +3,133 @@
 namespace App\Imports;
 
 use App\Models\Contact;
+use App\Models\Address;
 use App\Models\Tag;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
-use Maatwebsite\Excel\Row;
-use Maatwebsite\Excel\Concerns\OnEachRow;
 
-class ContactsImport implements OnEachRow, WithHeadingRow
+class ContactsImport implements ToCollection, WithHeadingRow
 {
-    protected int $ownerId;
-    protected string $matchBy; // id|email|phone
-    protected int $created = 0;
-    protected int $updated = 0;
-    protected int $skipped = 0;
-    protected array $errors = [];
+    protected $userId;
+    protected $matchBy;
+    protected $stats = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
 
-    public function __construct(int $ownerId, string $matchBy = 'id')
+    public function __construct(int $userId, string $matchBy = 'id')
     {
-        $this->ownerId = $ownerId;
-        $this->matchBy = in_array($matchBy, ['id','email','phone']) ? $matchBy : 'id';
+        $this->userId = $userId;
+        $this->matchBy = $matchBy;
     }
 
-    public function onRow(Row $row)
+    public function collection(Collection $rows)
     {
-        $data = $row->toArray(); // heading row => assoc
-
-        // Normalize keys to snake_case (in case user changes column names)
-        $data = collect($data)->keyBy(fn($v,$k)=>Str::snake(trim((string)$k)))->all();
-
-        // Skip if missing name and no key to match
-        $name = trim((string)($data['name'] ?? ''));
-        $email = trim((string)($data['email'] ?? ''));
-        $phone = trim((string)($data['phone'] ?? ''));
-        $idVal = $data['id'] ?? null;
-
-        if ($name === '' && empty($email) && empty($phone) && empty($idVal)) {
-            $this->skipped++; return;
-        }
-
-        // Find record by matchBy strategy
-        $contact = null;
-        if ($this->matchBy === 'id' && $idVal) {
-            $contact = Contact::where('owner_user_id', $this->ownerId)->find($idVal);
-        } elseif ($this->matchBy === 'email' && $email) {
-            $contact = Contact::where('owner_user_id', $this->ownerId)->where('email', $email)->first();
-        } elseif ($this->matchBy === 'phone' && $phone) {
-            $contact = Contact::where('owner_user_id', $this->ownerId)->where('phone', $phone)->first();
-        }
-
-        // Map valid fields
-        $payload = Arr::only($data, [
-            'name','company','job_title','email','phone','address','notes',
-            'linkedin_url','website_url','ocr_raw','duplicate_of_id','search_text','source',
-        ]);
-
-        // Basic validation (name/email)
-        if (!$contact && empty($payload['name'])) {
-            // Create requires name
-            $this->errors[] = ['row' => $row->getIndex(), 'error' => 'name is required for create'];
-            $this->skipped++; return;
-        }
-
-        // Normalize
-        $payload['source'] = $payload['source'] ?? 'manual';
-        if (isset($payload['duplicate_of_id']) && $payload['duplicate_of_id'] !== null) {
-            // Don't allow pointing to itself when matchBy = id and id matches
-            if ($contact && (int)$payload['duplicate_of_id'] === (int)$contact->id) {
-                $payload['duplicate_of_id'] = null;
-            }
-        }
-
-        // Upsert
-        if ($contact) {
-            $contact->fill($payload)->save();
-            $this->updated++;
-        } else {
-            $payload['owner_user_id'] = $this->ownerId;
-            $contact = Contact::create($payload);
-            $this->created++;
-        }
-
-        // Tags: "tags" column (comma-separated)
-        if (!empty($data['tags'])) {
-            $names = collect(explode(',', (string)$data['tags']))
-                ->map(fn($s)=>trim($s))
-                ->filter()
-                ->map(fn($s)=>ltrim($s, '#'))
-                ->unique()
-                ->values();
-
-            if ($names->isNotEmpty()) {
-                $ids = [];
-                foreach ($names as $nm) {
-                    $tag = Tag::firstOrCreate(['name' => $nm]);
-                    $ids[] = $tag->id;
-                }
-                $contact->tags()->syncWithoutDetaching($ids);
+        foreach ($rows as $index => $row) {
+            try {
+                $this->processRow($row, $index + 2); // +2 vì header row và zero-indexed
+            } catch (\Exception $e) {
+                $this->stats['errors'][] = "Row " . ($index + 2) . ": " . $e->getMessage();
+                $this->stats['skipped']++;
             }
         }
     }
 
-    public function result(): array
+    protected function processRow($row, $rowNumber)
     {
-        return [
-            'created' => $this->created,
-            'updated' => $this->updated,
-            'skipped' => $this->skipped,
-            'errors'  => $this->errors,
+        // Validate required fields
+        $name = trim($row['name'] ?? $row['name_'] ?? '');
+        if (!$name) {
+            throw new \Exception("Name is required");
+        }
+
+        // Prepare contact data
+        $contactData = [
+            'owner_user_id' => $this->userId,
+            'name' => $name,
+            'company' => $row['company'] ?? null,
+            'job_title' => $row['job_title'] ?? null,
+            'email' => $row['email'] ?? null,
+            'phone' => $row['phone'] ?? null,
+            'notes' => $row['notes'] ?? null,
+            'linkedin_url' => $row['linkedin_url'] ?? null,
+            'website_url' => $row['website_url'] ?? null,
+            'source' => $row['source'] ?? 'import',
         ];
+
+        // Xử lý address
+        $addressId = null;
+        $addressDetail = $row['address_detail'] ?? null;
+        $cityCode = $row['city'] ?? $row['city_code'] ?? null;
+        $stateCode = $row['state'] ?? $row['state_code'] ?? null;
+        $countryCode = $row['country'] ?? $row['country_code'] ?? null;
+
+        if ($addressDetail || $cityCode) {
+            // Lấy ID từ code
+            $cityId = $cityCode ? DB::table('cities')->where('code', $cityCode)->value('id') : null;
+            $stateId = $stateCode ? DB::table('states')->where('code', $stateCode)->value('id') : null;
+            $countryId = $countryCode ? DB::table('countries')->where('code', $countryCode)->value('id') : null;
+
+            $address = Address::create([
+                'address_detail' => $addressDetail,
+                'city_id' => $cityId,
+                'state_id' => $stateId,
+                'country_id' => $countryId,
+            ]);
+            $addressId = $address->id;
+        }
+
+        $contactData['address_id'] = $addressId;
+
+        // Find existing contact
+        $existing = null;
+        if ($this->matchBy === 'email' && !empty($contactData['email'])) {
+            $existing = Contact::where('owner_user_id', $this->userId)
+                ->where('email', $contactData['email'])
+                ->first();
+        } elseif ($this->matchBy === 'phone' && !empty($contactData['phone'])) {
+            $existing = Contact::where('owner_user_id', $this->userId)
+                ->where('phone', $contactData['phone'])
+                ->first();
+        } elseif ($this->matchBy === 'id' && !empty($row['id'])) {
+            $existing = Contact::where('owner_user_id', $this->userId)
+                ->where('id', $row['id'])
+                ->first();
+        }
+
+        // Create or update
+        if ($existing) {
+            $existing->update($contactData);
+            $contact = $existing;
+            $this->stats['updated']++;
+        } else {
+            $contact = Contact::create($contactData);
+            $this->stats['created']++;
+        }
+
+        // Process tags
+        $tagsString = $row['tags'] ?? '';
+        if ($tagsString) {
+            $tagNames = array_map('trim', explode(',', $tagsString));
+            $tagIds = [];
+
+            foreach ($tagNames as $tagName) {
+                $tagName = ltrim($tagName, '#');
+                if ($tagName) {
+                    $tag = Tag::firstOrCreate(
+                        ['owner_user_id' => $this->userId, 'name' => $tagName]
+                    );
+                    $tagIds[] = $tag->id;
+                }
+            }
+
+            if ($tagIds) {
+                $contact->tags()->sync($tagIds);
+            }
+        }
+    }
+
+    public function result()
+    {
+        return $this->stats;
     }
 }
