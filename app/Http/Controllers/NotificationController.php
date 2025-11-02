@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\UserNotification;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class NotificationController extends Controller
 {
@@ -12,39 +11,35 @@ class NotificationController extends Controller
      * @OA\Get(
      *     path="/api/notifications",
      *     tags={"Notifications"},
-     *     summary="Get user notifications with filters",
+     *     summary="List user notifications",
      *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="scope",
-     *         in="query",
-     *         description="Filter scope",
-     *         @OA\Schema(type="string", enum={"all", "unread", "upcoming", "past"}, default="all")
-     *     ),
-     *     @OA\Parameter(
-     *         name="limit",
-     *         in="query",
-     *         description="Maximum number of results (max 20)",
-     *         @OA\Schema(type="integer", default=20, maximum=20)
-     *     ),
+     *     @OA\Parameter(name="page", in="query", @OA\Schema(type="integer")),
+     *     @OA\Parameter(name="per_page", in="query", @OA\Schema(type="integer")),
      *     @OA\Response(
      *         response=200,
-     *         description="List of notifications",
+     *         description="Notifications list",
      *         @OA\JsonContent(
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="array",
-     *                 @OA\Items(ref="#/components/schemas/UserNotification")
-     *             )
+     *             type="object",
+     *             @OA\Property(property="data", type="array", @OA\Items(
+     *                 type="object",
+     *                 @OA\Property(property="id", type="integer"),
+     *                 @OA\Property(property="type", type="string"),
+     *                 @OA\Property(property="title", type="string"),
+     *                 @OA\Property(property="body", type="string"),
+     *                 @OA\Property(property="is_read", type="boolean"),
+     *                 @OA\Property(property="created_at", type="string", format="date-time")
+     *             )),
+     *             @OA\Property(property="current_page", type="integer"),
+     *             @OA\Property(property="total", type="integer")
      *         )
-     *     ),
-     *     @OA\Response(response=401, description="Unauthenticated")
+     *     )
      * )
      */
-    public function index(Request $r)
+    public function index(Request $request)
     {
-        $uid = $r->user()->id;
-        $limit = min(20, (int)$r->query('limit', 20));
-        $scope = $r->query('scope', 'all');
+        $uid = $request->user()->id;
+        $limit = min(20, (int)$request->query('limit', 20));
+        $scope = $request->query('scope', 'all');
 
         $q = UserNotification::where('owner_user_id', $uid);
 
@@ -53,7 +48,7 @@ class NotificationController extends Controller
         } elseif ($scope === 'upcoming') {
             $q->whereNotNull('scheduled_at')->where('scheduled_at', '>=', now());
         } elseif ($scope === 'past') {
-            $q->where(function($w){
+            $q->where(function ($w) {
                 $w->whereNull('scheduled_at')->orWhere('scheduled_at', '<', now());
             });
         }
@@ -67,12 +62,12 @@ class NotificationController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/notifications/{id}/read",
+     *     path="/api/notifications/{notification}/read",
      *     tags={"Notifications"},
      *     summary="Mark notification as read",
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
-     *         name="id",
+     *         name="notification",
      *         in="path",
      *         required=true,
      *         @OA\Schema(type="integer")
@@ -80,15 +75,17 @@ class NotificationController extends Controller
      *     @OA\Response(
      *         response=200,
      *         description="Notification marked as read",
-     *         @OA\JsonContent(ref="#/components/schemas/UserNotification")
-     *     ),
-     *     @OA\Response(response=403, description="Forbidden - Not notification owner"),
-     *     @OA\Response(response=404, description="Notification not found")
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="id", type="integer"),
+     *             @OA\Property(property="is_read", type="boolean")
+     *         )
+     *     )
      * )
      */
-    public function markRead(Request $r, UserNotification $notification)
+    public function markRead(Request $request, UserNotification $notification)
     {
-        abort_unless($notification->owner_user_id === $r->user()->id, 403);
+        abort_unless($notification->owner_user_id === $request->user()->id, 403);
         if ($notification->status === 'unread') {
             $notification->update(['status' => 'read', 'read_at' => now()]);
         }
@@ -97,12 +94,12 @@ class NotificationController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/notifications/{id}/done",
+     *     path="/api/notifications/{notification}/done",
      *     tags={"Notifications"},
      *     summary="Mark notification as done",
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
-     *         name="id",
+     *         name="notification",
      *         in="path",
      *         required=true,
      *         @OA\Schema(type="integer")
@@ -110,15 +107,17 @@ class NotificationController extends Controller
      *     @OA\Response(
      *         response=200,
      *         description="Notification marked as done",
-     *         @OA\JsonContent(ref="#/components/schemas/UserNotification")
-     *     ),
-     *     @OA\Response(response=403, description="Forbidden - Not notification owner"),
-     *     @OA\Response(response=404, description="Notification not found")
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="id", type="integer"),
+     *             @OA\Property(property="is_done", type="boolean")
+     *         )
+     *     )
      * )
      */
-    public function markDone(Request $r, UserNotification $notification)
+    public function markDone(Request $request, UserNotification $notification)
     {
-        abort_unless($notification->owner_user_id === $r->user()->id, 403);
+        abort_unless($notification->owner_user_id === $request->user()->id, 403);
         $notification->update(['status' => 'done', 'read_at' => now()]);
         return $notification;
     }
@@ -127,34 +126,26 @@ class NotificationController extends Controller
      * @OA\Post(
      *     path="/api/notifications/bulk-read",
      *     tags={"Notifications"},
-     *     summary="Bulk mark notifications as read",
+     *     summary="Mark multiple notifications as read",
      *     security={{"bearerAuth":{}}},
      *     @OA\RequestBody(
-     *         required=true,
      *         @OA\JsonContent(
-     *             required={"ids"},
-     *             @OA\Property(
-     *                 property="ids",
-     *                 type="array",
-     *                 @OA\Items(type="integer"),
-     *                 description="Array of notification IDs to mark as read"
-     *             )
+     *             @OA\Property(property="ids", type="array", @OA\Items(type="integer"))
      *         )
      *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Notifications marked as read",
      *         @OA\JsonContent(
-     *             @OA\Property(property="updated", type="integer", description="Number of notifications updated")
+     *             @OA\Property(property="updated", type="integer")
      *         )
-     *     ),
-     *     @OA\Response(response=422, description="Validation error")
+     *     )
      * )
      */
-    public function bulkRead(Request $r)
+    public function bulkRead(Request $request)
     {
-        $data = $r->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer']);
-        $uid = $r->user()->id;
+        $data = $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer']);
+        $uid = $request->user()->id;
         $count = UserNotification::where('owner_user_id', $uid)
             ->whereIn('id', $data['ids'])
             ->update(['status' => 'read', 'read_at' => now()]);
@@ -163,24 +154,22 @@ class NotificationController extends Controller
 
     /**
      * @OA\Delete(
-     *     path="/api/notifications/{id}",
+     *     path="/api/notifications/{notification}",
      *     tags={"Notifications"},
      *     summary="Delete a notification",
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
-     *         name="id",
+     *         name="notification",
      *         in="path",
      *         required=true,
      *         @OA\Schema(type="integer")
      *     ),
-     *     @OA\Response(response=204, description="Notification deleted successfully"),
-     *     @OA\Response(response=403, description="Forbidden - Not notification owner"),
-     *     @OA\Response(response=404, description="Notification not found")
+     *     @OA\Response(response=204, description="Notification deleted")
      * )
      */
-    public function destroy(Request $r, UserNotification $notification)
+    public function destroy(Request $request, UserNotification $notification)
     {
-        abort_unless($notification->owner_user_id === $r->user()->id, 403);
+        abort_unless($notification->owner_user_id === $request->user()->id, 403);
         $notification->delete();
         return response()->noContent();
     }

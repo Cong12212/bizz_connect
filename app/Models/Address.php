@@ -15,6 +15,21 @@ class Address extends Model
         return $this->hasMany(Contact::class);
     }
 
+    public function users()
+    {
+        return $this->hasMany(User::class);
+    }
+
+    public function businessCards()
+    {
+        return $this->hasMany(BusinessCard::class);
+    }
+
+    public function companies()
+    {
+        return $this->hasMany(Company::class);
+    }
+
     public function city()
     {
         return $this->belongsTo(City::class);

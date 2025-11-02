@@ -42,8 +42,16 @@ class ReminderController extends Controller
      *         response=200,
      *         description="Paginated reminders list",
      *         @OA\JsonContent(
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Reminder")),
-     *             @OA\Property(property="meta", type="object")
+     *             @OA\Property(property="data", type="array", @OA\Items(
+     *                 type="object",
+     *                 @OA\Property(property="id", type="integer"),
+     *                 @OA\Property(property="title", type="string"),
+     *                 @OA\Property(property="description", type="string", nullable=true),
+     *                 @OA\Property(property="due_at", type="string", format="date-time"),
+     *                 @OA\Property(property="status", type="string", enum={"pending", "done"})
+     *             )),
+     *             @OA\Property(property="current_page", type="integer"),
+     *             @OA\Property(property="total", type="integer")
      *         )
      *     )
      * )
@@ -54,18 +62,18 @@ class ReminderController extends Controller
         $q = Reminder::query()->where('owner_user_id', $uid);
 
         if ($cid = $r->query('contact_id')) {
-            $q->where(function($w) use ($cid) {
+            $q->where(function ($w) use ($cid) {
                 $w->where('contact_id', (int)$cid)
-                  ->orWhereHas('contacts', fn($t) => $t->where('contacts.id', (int)$cid));
+                    ->orWhereHas('contacts', fn($t) => $t->where('contacts.id', (int)$cid));
             });
         }
         if ($r->filled('status')) $q->where('status', $r->query('status'));
         if ($r->filled('before')) $q->where('due_at', '<=', Carbon::parse($r->query('before')));
         if ($r->filled('after'))  $q->where('due_at', '>=', Carbon::parse($r->query('after')));
         if ($r->boolean('overdue')) {
-            $q->where('status','pending')
-              ->whereNotNull('due_at')
-              ->where('due_at','<', now());
+            $q->where('status', 'pending')
+                ->whereNotNull('due_at')
+                ->where('due_at', '<', now());
         }
 
         if ($r->boolean('with_contacts')) $q->with('contacts');
@@ -84,7 +92,14 @@ class ReminderController extends Controller
      *     @OA\Response(
      *         response=200,
      *         description="Reminder details",
-     *         @OA\JsonContent(ref="#/components/schemas/Reminder")
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="id", type="integer"),
+     *             @OA\Property(property="title", type="string"),
+     *             @OA\Property(property="description", type="string", nullable=true),
+     *             @OA\Property(property="due_at", type="string", format="date-time"),
+     *             @OA\Property(property="status", type="string")
+     *         )
      *     ),
      *     @OA\Response(response=403, description="Forbidden"),
      *     @OA\Response(response=404, description="Reminder not found")
@@ -107,9 +122,9 @@ class ReminderController extends Controller
      *         required=true,
      *         @OA\JsonContent(
      *             required={"title", "due_at"},
-     *             @OA\Property(property="title", type="string", maxLength=255, example="Follow up meeting"),
-     *             @OA\Property(property="note", type="string", example="Discuss Q4 plans"),
-     *             @OA\Property(property="due_at", type="string", format="date-time", example="2024-12-31T10:00:00Z"),
+     *             @OA\Property(property="title", type="string"),
+     *             @OA\Property(property="description", type="string", nullable=true),
+     *             @OA\Property(property="due_at", type="string", format="date-time"),
      *             @OA\Property(property="status", type="string", enum={"pending", "done", "skipped", "cancelled"}, default="pending"),
      *             @OA\Property(property="channel", type="string", enum={"app", "email", "calendar"}, default="app"),
      *             @OA\Property(property="contact_id", type="integer", description="Primary contact ID"),
@@ -119,7 +134,12 @@ class ReminderController extends Controller
      *     @OA\Response(
      *         response=201,
      *         description="Reminder created successfully",
-     *         @OA\JsonContent(ref="#/components/schemas/Reminder")
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="id", type="integer"),
+     *             @OA\Property(property="title", type="string"),
+     *             @OA\Property(property="due_at", type="string", format="date-time")
+     *         )
      *     ),
      *     @OA\Response(response=422, description="Validation error")
      * )
@@ -131,22 +151,23 @@ class ReminderController extends Controller
             'title'   => 'required|string|max:255',
             'note'    => 'nullable|string',
             'due_at'  => 'required|date',
-            'status'  => ['nullable', Rule::in(['pending','done','skipped','cancelled'])],
-            'channel' => ['nullable', Rule::in(['app','email','calendar'])],
+            'status'  => ['nullable', Rule::in(['pending', 'done', 'skipped', 'cancelled'])],
+            'channel' => ['nullable', Rule::in(['app', 'email', 'calendar'])],
 
             'contact_id'  => [
-                'sometimes','integer',
-                Rule::exists('contacts','id')->where(fn($q)=>$q->where('owner_user_id',$uid)),
+                'sometimes',
+                'integer',
+                Rule::exists('contacts', 'id')->where(fn($q) => $q->where('owner_user_id', $uid)),
             ],
-            'contact_ids' => ['sometimes','array','min:1'],
+            'contact_ids' => ['sometimes', 'array', 'min:1'],
             'contact_ids.*' => [
                 'integer',
-                Rule::exists('contacts','id')->where(fn($q)=>$q->where('owner_user_id',$uid)),
+                Rule::exists('contacts', 'id')->where(fn($q) => $q->where('owner_user_id', $uid)),
             ],
         ]);
 
         $ids = collect($data['contact_ids'] ?? [])
-            ->when(isset($data['contact_id']), fn($c)=>$c->prepend((int)$data['contact_id']))
+            ->when(isset($data['contact_id']), fn($c) => $c->prepend((int)$data['contact_id']))
             ->unique()->filter()->values();
 
         if ($ids->isEmpty()) {
@@ -188,19 +209,20 @@ class ReminderController extends Controller
      *     @OA\Parameter(name="reminder", in="path", required=true, @OA\Schema(type="integer")),
      *     @OA\RequestBody(
      *         @OA\JsonContent(
-     *             @OA\Property(property="title", type="string", maxLength=255),
-     *             @OA\Property(property="note", type="string"),
+     *             @OA\Property(property="title", type="string"),
+     *             @OA\Property(property="description", type="string"),
      *             @OA\Property(property="due_at", type="string", format="date-time"),
-     *             @OA\Property(property="status", type="string", enum={"pending", "done", "skipped", "cancelled"}),
-     *             @OA\Property(property="channel", type="string", enum={"app", "email", "calendar"}),
-     *             @OA\Property(property="contact_id", type="integer"),
-     *             @OA\Property(property="contact_ids", type="array", @OA\Items(type="integer"))
+     *             @OA\Property(property="status", type="string", enum={"pending", "done"})
      *         )
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Reminder updated successfully",
-     *         @OA\JsonContent(ref="#/components/schemas/Reminder")
+     *         description="Reminder updated",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="id", type="integer"),
+     *             @OA\Property(property="title", type="string")
+     *         )
      *     )
      * )
      */
@@ -213,15 +235,15 @@ class ReminderController extends Controller
             'title'   => 'sometimes|string|max:255',
             'note'    => 'sometimes|nullable|string',
             'due_at'  => 'sometimes|nullable|date',
-            'status'  => ['sometimes', Rule::in(['pending','done','skipped','cancelled'])],
-            'channel' => ['sometimes', Rule::in(['app','email','calendar'])],
-            'contact_id'  => ['sometimes','integer', Rule::exists('contacts','id')->where(fn($q)=>$q->where('owner_user_id',$uid))],
-            'contact_ids' => ['sometimes','array','min:1'],
-            'contact_ids.*' => ['integer', Rule::exists('contacts','id')->where(fn($q)=>$q->where('owner_user_id',$uid))],
+            'status'  => ['sometimes', Rule::in(['pending', 'done', 'skipped', 'cancelled'])],
+            'channel' => ['sometimes', Rule::in(['app', 'email', 'calendar'])],
+            'contact_id'  => ['sometimes', 'integer', Rule::exists('contacts', 'id')->where(fn($q) => $q->where('owner_user_id', $uid))],
+            'contact_ids' => ['sometimes', 'array', 'min:1'],
+            'contact_ids.*' => ['integer', Rule::exists('contacts', 'id')->where(fn($q) => $q->where('owner_user_id', $uid))],
         ]);
 
         return DB::transaction(function () use ($reminder, $data, $uid) {
-            if (array_key_exists('due_at',$data)) {
+            if (array_key_exists('due_at', $data)) {
                 $data['due_at'] = $data['due_at'] ? \Carbon\Carbon::parse($data['due_at']) : null;
             }
 
@@ -229,7 +251,7 @@ class ReminderController extends Controller
 
             if (array_key_exists('contact_ids', $data) || array_key_exists('contact_id', $data)) {
                 $ids = collect($data['contact_ids'] ?? [])
-                    ->when(isset($data['contact_id']), fn($c)=>$c->prepend((int)$data['contact_id']))
+                    ->when(isset($data['contact_id']), fn($c) => $c->prepend((int)$data['contact_id']))
                     ->unique()->filter()->values();
 
                 if ($ids->isNotEmpty()) {
@@ -264,8 +286,7 @@ class ReminderController extends Controller
      *     summary="Delete a reminder",
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(name="reminder", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\Response(response=204, description="Reminder deleted successfully"),
-     *     @OA\Response(response=403, description="Forbidden")
+     *     @OA\Response(response=204, description="Reminder deleted")
      * )
      */
     public function destroy(Request $r, Reminder $reminder)
@@ -285,7 +306,11 @@ class ReminderController extends Controller
      *     @OA\Response(
      *         response=200,
      *         description="Reminder marked as done",
-     *         @OA\JsonContent(ref="#/components/schemas/Reminder")
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="id", type="integer"),
+     *             @OA\Property(property="status", type="string")
+     *         )
      *     )
      * )
      */
@@ -322,12 +347,13 @@ class ReminderController extends Controller
     {
         $uid = $r->user()->id;
         $data = $r->validate([
-            'ids' => ['required','array','min:1'], 'ids.*' => ['integer'],
-            'status' => ['required', Rule::in(['pending','done','skipped','cancelled'])],
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+            'status' => ['required', Rule::in(['pending', 'done', 'skipped', 'cancelled'])],
         ]);
-        $count = Reminder::where('owner_user_id',$uid)->whereIn('id',$data['ids'])
-            ->update(['status'=>$data['status']]);
-        return ['updated'=>$count];
+        $count = Reminder::where('owner_user_id', $uid)->whereIn('id', $data['ids'])
+            ->update(['status' => $data['status']]);
+        return ['updated' => $count];
     }
 
     /** BULK: delete */
@@ -405,7 +431,16 @@ class ReminderController extends Controller
      *     @OA\Response(
      *         response=200,
      *         description="Contacts attached",
-     *         @OA\JsonContent(ref="#/components/schemas/Reminder")
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="id", type="integer"),
+     *             @OA\Property(property="title", type="string"),
+     *             @OA\Property(property="contacts", type="array", @OA\Items(
+     *                 type="object",
+     *                 @OA\Property(property="id", type="integer"),
+     *                 @OA\Property(property="name", type="string")
+     *             ))
+     *         )
      *     )
      * )
      */
@@ -415,12 +450,12 @@ class ReminderController extends Controller
         $uid = $r->user()->id;
 
         $payload = $r->validate([
-            'ids'   => ['required','array','min:1'],
+            'ids'   => ['required', 'array', 'min:1'],
             'ids.*' => [
                 'integer',
-                Rule::exists('contacts','id')->where(fn($q)=>$q->where('owner_user_id',$uid)),
+                Rule::exists('contacts', 'id')->where(fn($q) => $q->where('owner_user_id', $uid)),
             ],
-            'set_primary' => ['sometimes','boolean'],
+            'set_primary' => ['sometimes', 'boolean'],
         ]);
 
         return DB::transaction(function () use ($reminder, $payload) {
@@ -477,7 +512,15 @@ class ReminderController extends Controller
      *         response=200,
      *         description="Paginated reminders for contact",
      *         @OA\JsonContent(
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Reminder"))
+     *             @OA\Property(property="data", type="array", @OA\Items(
+     *                 type="object",
+     *                 @OA\Property(property="id", type="integer"),
+     *                 @OA\Property(property="title", type="string"),
+     *                 @OA\Property(property="due_at", type="string", format="date-time"),
+     *                 @OA\Property(property="status", type="string")
+     *             )),
+     *             @OA\Property(property="current_page", type="integer"),
+     *             @OA\Property(property="total", type="integer")
      *         )
      *     )
      * )
@@ -488,9 +531,9 @@ class ReminderController extends Controller
         $uid = $r->user()->id;
 
         $q = Reminder::where('owner_user_id', $uid)
-            ->where(function($w) use ($contact) {
+            ->where(function ($w) use ($contact) {
                 $w->where('contact_id', $contact->id)
-                  ->orWhereHas('contacts', fn($t) => $t->where('contacts.id', $contact->id));
+                    ->orWhereHas('contacts', fn($t) => $t->where('contacts.id', $contact->id));
             });
 
         $per = $this->parsePerPage($r, 50);
@@ -523,65 +566,65 @@ class ReminderController extends Controller
      *     )
      * )
      */
-   public function pivotIndex(Request $r)
-   {
-       $uid = $r->user()->id;
+    public function pivotIndex(Request $r)
+    {
+        $uid = $r->user()->id;
 
-    // per_page: chấp nhận "20" hoặc "20/page"
-    $perRaw = (string) $r->query('per_page', '20');
-    preg_match('/\d+/', $perRaw, $m);
-    $per  = max(1, min(100, (int)($m[0] ?? 20)));
-    $page = max(1, (int)$r->query('page', 1));
+        // per_page: chấp nhận "20" hoặc "20/page"
+        $perRaw = (string) $r->query('per_page', '20');
+        preg_match('/\d+/', $perRaw, $m);
+        $per  = max(1, min(100, (int)($m[0] ?? 20)));
+        $page = max(1, (int)$r->query('page', 1));
 
-    // ===== Base query (chung các filter) – KHÔNG select cột ở đây =====
-    $base = \DB::table('contact_reminder as cr')
-        ->join('reminders as r', 'r.id', '=', 'cr.reminder_id')
-        ->join('contacts  as c', 'c.id', '=', 'cr.contact_id')
-        ->where('r.owner_user_id', $uid);
+        // ===== Base query =====
+        $base = DB::table('contact_reminder as cr')
+            ->join('reminders as r', 'r.id', '=', 'cr.reminder_id')
+            ->join('contacts  as c', 'c.id', '=', 'cr.contact_id')
+            ->where('r.owner_user_id', $uid);
 
-    if ($r->filled('status'))     $base->where('r.status', $r->query('status'));
-    if ($r->filled('contact_id')) $base->where('cr.contact_id', (int)$r->query('contact_id'));
-    if ($r->filled('after'))      $base->where('r.due_at', '>=', $r->query('after'));
-    if ($r->filled('before'))     $base->where('r.due_at', '<=', $r->query('before'));
-    if ($r->boolean('overdue')) {
-        $base->whereNotNull('r.due_at')
-             ->where('r.due_at', '<', now())
-             ->where('r.status', '!=', 'done');
-    }
+        if ($r->filled('status'))     $base->where('r.status', $r->query('status'));
+        if ($r->filled('contact_id')) $base->where('cr.contact_id', (int)$r->query('contact_id'));
+        if ($r->filled('after'))      $base->where('r.due_at', '>=', $r->query('after'));
+        if ($r->filled('before'))     $base->where('r.due_at', '<=', $r->query('before'));
+        if ($r->boolean('overdue')) {
+            $base->whereNotNull('r.due_at')
+                ->where('r.due_at', '<', now())
+                ->where('r.status', '!=', 'done');
+        }
 
-    // ===== 1) Lấy danh sách DISTINCT reminder_id theo thứ tự sort =====
-    // MySQL: dùng subquery group-by để vừa distinct vừa giữ order mong muốn
-    $distinctRem = (clone $base)
-        ->select('r.id as reminder_id', 'r.due_at')
-        ->groupBy('r.id', 'r.due_at');
+        // ===== 1) Lấy danh sách DISTINCT reminder_id theo thứ tự sort =====
+        // MySQL: dùng subquery group-by để vừa distinct vừa giữ order mong muốn
+        $distinctRem = (clone $base)
+            ->select('r.id as reminder_id', 'r.due_at')
+            ->groupBy('r.id', 'r.due_at');
 
-    // Tổng số reminder sau khi lọc
-    $total = \DB::query()->fromSub($distinctRem, 't')->count();
+        // Tổng số reminder sau khi lọc
+        $total = DB::query()->fromSub($distinctRem, 't')->count();
 
-    // forPage = OFFSET/LIMIT theo trang
-    $orderExpr = 't.due_at is null asc, t.due_at asc, t.reminder_id desc';
-    $ids = \DB::query()
-        ->fromSub($distinctRem, 't')
-        ->orderByRaw($orderExpr)
-        ->forPage($page, $per)
-        ->pluck('reminder_id')
-        ->all();
+        // forPage = OFFSET/LIMIT theo trang
+        $orderExpr = 't.due_at is null asc, t.due_at asc, t.reminder_id desc';
+        $ids = DB::query()
+            ->fromSub($distinctRem, 't')
+            ->orderByRaw($orderExpr)
+            ->forPage($page, $per)
+            ->pluck('reminder_id')
+            ->all();
 
-    // Nếu trang không có gì
-    if (empty($ids)) {
-        return response()->json([
-            'data'         => [],
-            'total'        => $total,
-            'per_page'     => $per,
-            'current_page' => $page,
-            'last_page'    => (int) ceil($total / $per),
-        ]);
-    }
+        // Nếu trang không có gì
+        if (empty($ids)) {
+            return response()->json([
+                'data'         => [],
+                'total'        => $total,
+                'per_page'     => $per,
+                'current_page' => $page,
+                'last_page'    => (int) ceil($total / $per),
+            ]);
+        }
 
-    // ===== 2) Lấy toàn bộ EDGES của các reminder_id trong trang đó =====
-    $rows = (clone $base)
-        ->whereIn('r.id', $ids)
-        ->selectRaw("
+        // ===== 2) Lấy toàn bộ EDGES của các reminder_id trong trang đó =====
+        $rows = (clone $base)
+            ->whereIn('r.id', $ids)
+            ->selectRaw("
             CONCAT(r.id, ':', cr.contact_id)      as edge_key,
             r.id                                  as reminder_id,
             cr.contact_id                         as contact_id,
@@ -597,18 +640,17 @@ class ReminderController extends Controller
             c.name                                as contact_name,
             c.company                             as contact_company
         ")
-        // Thứ tự: theo order của reminder, rồi theo contact để hiển thị ổn định
-        ->orderByRaw('r.due_at is null asc, r.due_at asc, r.id desc')
-        ->orderBy('cr.contact_id')
-        ->get();
+            // Thứ tự: theo order của reminder, rồi theo contact để hiển thị ổn định
+            ->orderByRaw('r.due_at is null asc, r.due_at asc, r.id desc')
+            ->orderBy('cr.contact_id')
+            ->get();
 
-    return response()->json([
-        'data'         => $rows,
-        'total'        => $total,                   // tổng SỐ REMINDER
-        'per_page'     => $per,
-        'current_page' => $page,
-        'last_page'    => (int) ceil($total / $per),
-    ]);
-}
-
+        return response()->json([
+            'data'         => $rows,
+            'total'        => $total,                   // tổng SỐ REMINDER
+            'per_page'     => $per,
+            'current_page' => $page,
+            'last_page'    => (int) ceil($total / $per),
+        ]);
+    }
 }

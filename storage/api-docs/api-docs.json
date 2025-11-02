@@ -1,16 +1,13 @@
 {
     "openapi": "3.0.0",
     "info": {
-        "title": "Bizz Connect API Documentation",
-        "description": "RESTful API for Bizz Connect - Contact & Business Management System",
-        "contact": {
-            "email": "support@bizzconnect.com"
-        },
+        "title": "Bizz Connect API",
+        "description": "API documentation for Bizz Connect application",
         "version": "1.0.0"
     },
     "servers": [
         {
-            "url": "https://bizz-connect.onrender.com",
+            "url": "http://127.0.0.1:8000",
             "description": "API Server"
         }
     ],
@@ -142,23 +139,58 @@
         "/api/auth/me": {
             "get": {
                 "tags": [
-                    "User"
+                    "Auth"
                 ],
-                "summary": "Get current user",
+                "summary": "Get current user info",
                 "operationId": "b9abb1a7a74670a19c215c2c133f14d8",
                 "responses": {
                     "200": {
-                        "description": "Current user data",
+                        "description": "Current user",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/User"
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer",
+                                            "example": 1
+                                        },
+                                        "name": {
+                                            "type": "string",
+                                            "example": "John Doe"
+                                        },
+                                        "email": {
+                                            "type": "string",
+                                            "example": "john@example.com"
+                                        },
+                                        "phone": {
+                                            "type": "string",
+                                            "example": "+84123456789",
+                                            "nullable": true
+                                        },
+                                        "avatar_url": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "verified": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "created_at": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                        },
+                                        "updated_at": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                        }
+                                    },
+                                    "type": "object"
                                 }
                             }
                         }
                     },
                     "401": {
-                        "description": "Unauthenticated"
+                        "description": "Unauthorized"
                     }
                 },
                 "security": [
@@ -396,7 +428,98 @@
                 "operationId": "67f688541c1600cd229dcddd4fe58b88",
                 "responses": {
                     "200": {
-                        "description": "Business card details"
+                        "description": "Business card found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "full_name": {
+                                            "type": "string"
+                                        },
+                                        "job_title": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "email": {
+                                            "type": "string"
+                                        },
+                                        "phone": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "mobile": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "website": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "linkedin": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "facebook": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "twitter": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "company": {
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string"
+                                                },
+                                                "website": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
+                                                "logo": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                }
+                                            },
+                                            "type": "object",
+                                            "nullable": true
+                                        },
+                                        "address": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "address_detail": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
+                                                "city_id": {
+                                                    "type": "integer",
+                                                    "nullable": true
+                                                },
+                                                "state_id": {
+                                                    "type": "integer",
+                                                    "nullable": true
+                                                },
+                                                "country_id": {
+                                                    "type": "integer",
+                                                    "nullable": true
+                                                }
+                                            },
+                                            "type": "object",
+                                            "nullable": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "204": {
+                        "description": "No business card"
                     }
                 },
                 "security": [
@@ -411,9 +534,91 @@
                 ],
                 "summary": "Create or update user's business card",
                 "operationId": "bed02efc9904213df799e9c343ac1b4a",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "full_name",
+                                    "email"
+                                ],
+                                "properties": {
+                                    "company_id": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "full_name": {
+                                        "type": "string"
+                                    },
+                                    "job_title": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "department": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    },
+                                    "phone": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "mobile": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "website": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "address_detail": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "city": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "state": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "country": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "linkedin": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "facebook": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "twitter": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "is_public": {
+                                        "type": "boolean",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
-                        "description": "Business card saved"
+                        "description": "Saved"
+                    },
+                    "422": {
+                        "description": "Validation or save failed"
                     }
                 },
                 "security": [
@@ -431,6 +636,9 @@
                 "responses": {
                     "200": {
                         "description": "Deleted"
+                    },
+                    "404": {
+                        "description": "No business card found"
                     }
                 },
                 "security": [
@@ -459,7 +667,17 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Public business card"
+                        "description": "Public card",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found"
                     }
                 }
             }
@@ -482,79 +700,17 @@
                     }
                 ],
                 "responses": {
+                    "201": {
+                        "description": "Connected and contact created"
+                    },
                     "200": {
-                        "description": "Connection created"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/company": {
-            "get": {
-                "tags": [
-                    "Company"
-                ],
-                "summary": "Get user's company",
-                "operationId": "2f0dc321dc73eb84c8832e8aa4152c8f",
-                "responses": {
-                    "200": {
-                        "description": "Company details"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "post": {
-                "tags": [
-                    "Company"
-                ],
-                "summary": "Create or update user's company",
-                "operationId": "faf1545d2af89079ca55c4f9ed6ea302",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "name"
-                                ],
-                                "properties": {
-                                    "name": {
-                                        "type": "string"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Company saved"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "delete": {
-                "tags": [
-                    "Company"
-                ],
-                "summary": "Delete user's company",
-                "operationId": "8f28fbfe903d3ab1c83e01172b499d5f",
-                "responses": {
-                    "200": {
-                        "description": "Company deleted"
+                        "description": "Already connected"
+                    },
+                    "400": {
+                        "description": "Cannot connect with yourself"
+                    },
+                    "404": {
+                        "description": "Public card not found"
                     }
                 },
                 "security": [
@@ -569,132 +725,41 @@
                 "tags": [
                     "Contacts"
                 ],
-                "summary": "Get contacts list with filters",
+                "summary": "List contacts",
                 "operationId": "0f9efb5609dbb039b35ecafb28e492a2",
                 "parameters": [
                     {
                         "name": "q",
                         "in": "query",
-                        "description": "Search term (supports #hashtags)",
                         "schema": {
                             "type": "string"
                         }
                     },
                     {
-                        "name": "tag_ids",
+                        "name": "tag",
                         "in": "query",
-                        "description": "Filter by tag IDs (comma-separated)",
                         "schema": {
                             "type": "string"
                         }
                     },
                     {
-                        "name": "tags",
+                        "name": "page",
                         "in": "query",
-                        "description": "Filter by tag names (comma-separated)",
                         "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "tag_mode",
-                        "in": "query",
-                        "description": "Tag matching mode",
-                        "schema": {
-                            "type": "string",
-                            "default": "any",
-                            "enum": [
-                                "any",
-                                "all"
-                            ]
-                        }
-                    },
-                    {
-                        "name": "without_tag",
-                        "in": "query",
-                        "description": "Exclude contacts with this tag (ID or name)",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "with_reminder",
-                        "in": "query",
-                        "description": "Filter contacts with reminders",
-                        "schema": {
-                            "type": "boolean"
-                        }
-                    },
-                    {
-                        "name": "without_reminder",
-                        "in": "query",
-                        "description": "Filter contacts without reminders",
-                        "schema": {
-                            "type": "boolean"
-                        }
-                    },
-                    {
-                        "name": "status",
-                        "in": "query",
-                        "description": "Reminder status filter",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "after",
-                        "in": "query",
-                        "description": "Reminder due after date",
-                        "schema": {
-                            "type": "string",
-                            "format": "date"
-                        }
-                    },
-                    {
-                        "name": "before",
-                        "in": "query",
-                        "description": "Reminder due before date",
-                        "schema": {
-                            "type": "string",
-                            "format": "date"
-                        }
-                    },
-                    {
-                        "name": "exclude_ids",
-                        "in": "query",
-                        "description": "Exclude contact IDs (comma-separated)",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "sort",
-                        "in": "query",
-                        "description": "Sort field",
-                        "schema": {
-                            "type": "string",
-                            "default": "-id",
-                            "enum": [
-                                "name",
-                                "-name",
-                                "id",
-                                "-id"
-                            ]
+                            "type": "integer"
                         }
                     },
                     {
                         "name": "per_page",
                         "in": "query",
-                        "description": "Items per page (max 100)",
                         "schema": {
-                            "type": "integer",
-                            "default": 20
+                            "type": "integer"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Paginated contacts list",
+                        "description": "Contacts list",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -702,11 +767,41 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/components/schemas/Contact"
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "name": {
+                                                        "type": "string"
+                                                    },
+                                                    "email": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "phone": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "company": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "job_title": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    }
+                                                },
+                                                "type": "object"
                                             }
                                         },
-                                        "meta": {
-                                            "type": "object"
+                                        "current_page": {
+                                            "type": "integer"
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        },
+                                        "per_page": {
+                                            "type": "integer"
                                         }
                                     },
                                     "type": "object"
@@ -762,10 +857,21 @@
                                         "maxLength": 50,
                                         "example": "+1234567890"
                                     },
-                                    "address": {
+                                    "address_detail": {
                                         "type": "string",
-                                        "maxLength": 255,
-                                        "example": "123 Main St"
+                                        "maxLength": 255
+                                    },
+                                    "city": {
+                                        "type": "string",
+                                        "maxLength": 20
+                                    },
+                                    "state": {
+                                        "type": "string",
+                                        "maxLength": 20
+                                    },
+                                    "country": {
+                                        "type": "string",
+                                        "maxLength": 10
                                     },
                                     "notes": {
                                         "type": "string",
@@ -780,24 +886,6 @@
                                         "type": "string",
                                         "format": "url",
                                         "maxLength": 255
-                                    },
-                                    "ocr_raw": {
-                                        "description": "Raw OCR text from business card",
-                                        "type": "string"
-                                    },
-                                    "duplicate_of_id": {
-                                        "description": "ID of original contact if duplicate",
-                                        "type": "integer"
-                                    },
-                                    "search_text": {
-                                        "description": "Additional searchable text",
-                                        "type": "string"
-                                    },
-                                    "source": {
-                                        "description": "Contact source",
-                                        "type": "string",
-                                        "maxLength": 50,
-                                        "example": "manual"
                                     }
                                 },
                                 "type": "object"
@@ -813,7 +901,31 @@
                                 "schema": {
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/components/schemas/Contact"
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "name": {
+                                                    "type": "string"
+                                                },
+                                                "email": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
+                                                "phone": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
+                                                "company": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
+                                                "job_title": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
@@ -832,16 +944,16 @@
                 ]
             }
         },
-        "/api/contacts/{contact}": {
+        "/api/contacts/{id}": {
             "get": {
                 "tags": [
                     "Contacts"
                 ],
-                "summary": "Get a specific contact",
-                "operationId": "1a9a36d323d70f1d5d15a163b14bb811",
+                "summary": "Get contact details",
+                "operationId": "4b37f4c90f5cd7974a09bd688ac4d3dd",
                 "parameters": [
                     {
-                        "name": "contact",
+                        "name": "id",
                         "in": "path",
                         "required": true,
                         "schema": {
@@ -851,13 +963,36 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Contact details",
+                        "description": "Contact found",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "properties": {
-                                        "data": {
-                                            "$ref": "#/components/schemas/Contact"
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "email": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "phone": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "company": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "job_title": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "notes": {
+                                            "type": "string",
+                                            "nullable": true
                                         }
                                     },
                                     "type": "object"
@@ -865,11 +1000,8 @@
                             }
                         }
                     },
-                    "403": {
-                        "description": "Forbidden"
-                    },
                     "404": {
-                        "description": "Contact not found"
+                        "description": "Not found"
                     }
                 },
                 "security": [
@@ -877,7 +1009,9 @@
                         "bearerAuth": []
                     }
                 ]
-            },
+            }
+        },
+        "/api/contacts/{contact}": {
             "put": {
                 "tags": [
                     "Contacts"
@@ -920,7 +1054,7 @@
                                         "type": "string",
                                         "maxLength": 50
                                     },
-                                    "address": {
+                                    "address_detail": {
                                         "type": "string",
                                         "maxLength": 255
                                     },
@@ -936,13 +1070,6 @@
                                         "type": "string",
                                         "format": "url",
                                         "maxLength": 255
-                                    },
-                                    "duplicate_of_id": {
-                                        "type": "integer"
-                                    },
-                                    "source": {
-                                        "type": "string",
-                                        "maxLength": 50
                                     }
                                 },
                                 "type": "object"
@@ -958,7 +1085,23 @@
                                 "schema": {
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/components/schemas/Contact"
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "name": {
+                                                    "type": "string"
+                                                },
+                                                "email": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
+                                                "phone": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
@@ -967,7 +1110,7 @@
                         }
                     },
                     "422": {
-                        "description": "Validation error or circular duplicate"
+                        "description": "Validation error"
                     }
                 },
                 "security": [
@@ -1033,14 +1176,12 @@
                             "schema": {
                                 "properties": {
                                     "ids": {
-                                        "description": "Tag IDs to attach",
                                         "type": "array",
                                         "items": {
                                             "type": "integer"
                                         }
                                     },
                                     "names": {
-                                        "description": "Tag names to attach (will be created if not exist)",
                                         "type": "array",
                                         "items": {
                                             "type": "string"
@@ -1058,7 +1199,29 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Contact"
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "tags": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "name": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
                                 }
                             }
                         }
@@ -1102,13 +1265,18 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Contact"
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
                                 }
                             }
                         }
-                    },
-                    "403": {
-                        "description": "Forbidden"
                     }
                 },
                 "security": [
@@ -1350,6 +1518,40 @@
                 ]
             }
         },
+        "/api/contacts/export-template": {
+            "get": {
+                "tags": [
+                    "Contacts"
+                ],
+                "summary": "Download import template",
+                "operationId": "b21ac98ab2c1ad0ce2d3d68bb07514fd",
+                "parameters": [
+                    {
+                        "name": "format",
+                        "in": "query",
+                        "description": "Format",
+                        "schema": {
+                            "type": "string",
+                            "default": "xlsx",
+                            "enum": [
+                                "xlsx",
+                                "csv"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Template file download"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/contacts/{contact}/tags/attach": {
             "post": {
                 "tags": [
@@ -1400,7 +1602,34 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Contact"
+                                    "properties": {
+                                        "contact": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "name": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "tags": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "name": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
                                 }
                             }
                         }
@@ -1455,7 +1684,34 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Contact"
+                                    "properties": {
+                                        "contact": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "name": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "tags": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "name": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
                                 }
                             }
                         }
@@ -1474,43 +1730,94 @@
                 ]
             }
         },
-        "/api/notifications": {
+        "/api/countries": {
             "get": {
                 "tags": [
-                    "Notifications"
+                    "Locations"
                 ],
-                "summary": "Get user notifications with filters",
-                "operationId": "911565ad9aff9ba7eded3f189509e578",
+                "summary": "Get all countries",
+                "operationId": "6f246bb0b70ced45404edc78d5dd996e",
+                "responses": {
+                    "200": {
+                        "description": "List of countries"
+                    }
+                }
+            }
+        },
+        "/api/countries/{code}/states": {
+            "get": {
+                "tags": [
+                    "Locations"
+                ],
+                "summary": "Get states by country code",
+                "operationId": "06b73d2794736a1167687d9bbc00a4c5",
                 "parameters": [
                     {
-                        "name": "scope",
-                        "in": "query",
-                        "description": "Filter scope",
+                        "name": "code",
+                        "in": "path",
+                        "required": true,
                         "schema": {
-                            "type": "string",
-                            "default": "all",
-                            "enum": [
-                                "all",
-                                "unread",
-                                "upcoming",
-                                "past"
-                            ]
-                        }
-                    },
-                    {
-                        "name": "limit",
-                        "in": "query",
-                        "description": "Maximum number of results (max 20)",
-                        "schema": {
-                            "type": "integer",
-                            "default": 20,
-                            "maximum": 20
+                            "type": "string"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "List of notifications",
+                        "description": "List of states"
+                    }
+                }
+            }
+        },
+        "/api/states/{code}/cities": {
+            "get": {
+                "tags": [
+                    "Locations"
+                ],
+                "summary": "Get cities by state code",
+                "operationId": "225395ffe7d55ae87d90c9e56c4fbc88",
+                "parameters": [
+                    {
+                        "name": "code",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of cities"
+                    }
+                }
+            }
+        },
+        "/api/notifications": {
+            "get": {
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "List user notifications",
+                "operationId": "911565ad9aff9ba7eded3f189509e578",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Notifications list",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1518,17 +1825,41 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/components/schemas/UserNotification"
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "type": {
+                                                        "type": "string"
+                                                    },
+                                                    "title": {
+                                                        "type": "string"
+                                                    },
+                                                    "body": {
+                                                        "type": "string"
+                                                    },
+                                                    "is_read": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    }
+                                                },
+                                                "type": "object"
                                             }
+                                        },
+                                        "current_page": {
+                                            "type": "integer"
+                                        },
+                                        "total": {
+                                            "type": "integer"
                                         }
                                     },
                                     "type": "object"
                                 }
                             }
                         }
-                    },
-                    "401": {
-                        "description": "Unauthenticated"
                     }
                 },
                 "security": [
@@ -1538,16 +1869,16 @@
                 ]
             }
         },
-        "/api/notifications/{id}/read": {
+        "/api/notifications/{notification}/read": {
             "post": {
                 "tags": [
                     "Notifications"
                 ],
                 "summary": "Mark notification as read",
-                "operationId": "d3c26645cf40210e054d72089f8097a5",
+                "operationId": "0e999c4d7867cc52f1e92e807801fd14",
                 "parameters": [
                     {
-                        "name": "id",
+                        "name": "notification",
                         "in": "path",
                         "required": true,
                         "schema": {
@@ -1561,16 +1892,18 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/UserNotification"
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "is_read": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "type": "object"
                                 }
                             }
                         }
-                    },
-                    "403": {
-                        "description": "Forbidden - Not notification owner"
-                    },
-                    "404": {
-                        "description": "Notification not found"
                     }
                 },
                 "security": [
@@ -1580,16 +1913,16 @@
                 ]
             }
         },
-        "/api/notifications/{id}/done": {
+        "/api/notifications/{notification}/done": {
             "post": {
                 "tags": [
                     "Notifications"
                 ],
                 "summary": "Mark notification as done",
-                "operationId": "bd017904c30d894edad2eec2809e05b3",
+                "operationId": "a664d24c8ceb7ad87a88a9bbb039083a",
                 "parameters": [
                     {
-                        "name": "id",
+                        "name": "notification",
                         "in": "path",
                         "required": true,
                         "schema": {
@@ -1603,16 +1936,18 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/UserNotification"
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "is_done": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "type": "object"
                                 }
                             }
                         }
-                    },
-                    "403": {
-                        "description": "Forbidden - Not notification owner"
-                    },
-                    "404": {
-                        "description": "Notification not found"
                     }
                 },
                 "security": [
@@ -1627,19 +1962,14 @@
                 "tags": [
                     "Notifications"
                 ],
-                "summary": "Bulk mark notifications as read",
+                "summary": "Mark multiple notifications as read",
                 "operationId": "e99069977dc1b7fb2597dabde3a9a98e",
                 "requestBody": {
-                    "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
-                                "required": [
-                                    "ids"
-                                ],
                                 "properties": {
                                     "ids": {
-                                        "description": "Array of notification IDs to mark as read",
                                         "type": "array",
                                         "items": {
                                             "type": "integer"
@@ -1659,7 +1989,6 @@
                                 "schema": {
                                     "properties": {
                                         "updated": {
-                                            "description": "Number of notifications updated",
                                             "type": "integer"
                                         }
                                     },
@@ -1667,9 +1996,6 @@
                                 }
                             }
                         }
-                    },
-                    "422": {
-                        "description": "Validation error"
                     }
                 },
                 "security": [
@@ -1679,16 +2005,16 @@
                 ]
             }
         },
-        "/api/notifications/{id}": {
+        "/api/notifications/{notification}": {
             "delete": {
                 "tags": [
                     "Notifications"
                 ],
                 "summary": "Delete a notification",
-                "operationId": "54c4eb5ec5dc0d1e2916cec2fced1056",
+                "operationId": "7f078e4ee294fe830b4b842939b15a12",
                 "parameters": [
                     {
-                        "name": "id",
+                        "name": "notification",
                         "in": "path",
                         "required": true,
                         "schema": {
@@ -1698,13 +2024,7 @@
                 ],
                 "responses": {
                     "204": {
-                        "description": "Notification deleted successfully"
-                    },
-                    "403": {
-                        "description": "Forbidden - Not notification owner"
-                    },
-                    "404": {
-                        "description": "Notification not found"
+                        "description": "Notification deleted"
                     }
                 },
                 "security": [
@@ -1798,11 +2118,37 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/components/schemas/Reminder"
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "title": {
+                                                        "type": "string"
+                                                    },
+                                                    "description": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "due_at": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    "status": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "pending",
+                                                            "done"
+                                                        ]
+                                                    }
+                                                },
+                                                "type": "object"
                                             }
                                         },
-                                        "meta": {
-                                            "type": "object"
+                                        "current_page": {
+                                            "type": "integer"
+                                        },
+                                        "total": {
+                                            "type": "integer"
                                         }
                                     },
                                     "type": "object"
@@ -1834,18 +2180,15 @@
                                 ],
                                 "properties": {
                                     "title": {
-                                        "type": "string",
-                                        "maxLength": 255,
-                                        "example": "Follow up meeting"
+                                        "type": "string"
                                     },
-                                    "note": {
+                                    "description": {
                                         "type": "string",
-                                        "example": "Discuss Q4 plans"
+                                        "nullable": true
                                     },
                                     "due_at": {
                                         "type": "string",
-                                        "format": "date-time",
-                                        "example": "2024-12-31T10:00:00Z"
+                                        "format": "date-time"
                                     },
                                     "status": {
                                         "type": "string",
@@ -1889,7 +2232,19 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Reminder"
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "title": {
+                                            "type": "string"
+                                        },
+                                        "due_at": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                        }
+                                    },
+                                    "type": "object"
                                 }
                             }
                         }
@@ -1928,7 +2283,26 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Reminder"
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "title": {
+                                            "type": "string"
+                                        },
+                                        "description": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "due_at": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                        },
+                                        "status": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
                                 }
                             }
                         }
@@ -1964,10 +2338,7 @@
                 ],
                 "responses": {
                     "204": {
-                        "description": "Reminder deleted successfully"
-                    },
-                    "403": {
-                        "description": "Forbidden"
+                        "description": "Reminder deleted"
                     }
                 },
                 "security": [
@@ -1998,10 +2369,9 @@
                             "schema": {
                                 "properties": {
                                     "title": {
-                                        "type": "string",
-                                        "maxLength": 255
+                                        "type": "string"
                                     },
-                                    "note": {
+                                    "description": {
                                         "type": "string"
                                     },
                                     "due_at": {
@@ -2012,27 +2382,8 @@
                                         "type": "string",
                                         "enum": [
                                             "pending",
-                                            "done",
-                                            "skipped",
-                                            "cancelled"
+                                            "done"
                                         ]
-                                    },
-                                    "channel": {
-                                        "type": "string",
-                                        "enum": [
-                                            "app",
-                                            "email",
-                                            "calendar"
-                                        ]
-                                    },
-                                    "contact_id": {
-                                        "type": "integer"
-                                    },
-                                    "contact_ids": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer"
-                                        }
                                     }
                                 },
                                 "type": "object"
@@ -2042,11 +2393,19 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Reminder updated successfully",
+                        "description": "Reminder updated",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Reminder"
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "title": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
                                 }
                             }
                         }
@@ -2082,7 +2441,15 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Reminder"
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "status": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
                                 }
                             }
                         }
@@ -2263,7 +2630,29 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Reminder"
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "title": {
+                                            "type": "string"
+                                        },
+                                        "contacts": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "name": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
                                 }
                             }
                         }
@@ -2360,8 +2749,29 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/components/schemas/Reminder"
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "title": {
+                                                        "type": "string"
+                                                    },
+                                                    "due_at": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    "status": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
                                             }
+                                        },
+                                        "current_page": {
+                                            "type": "integer"
+                                        },
+                                        "total": {
+                                            "type": "integer"
                                         }
                                     },
                                     "type": "object"
@@ -2489,7 +2899,7 @@
                     {
                         "name": "q",
                         "in": "query",
-                        "description": "Search term (supports # prefix)",
+                        "description": "Search term",
                         "schema": {
                             "type": "string"
                         }
@@ -2497,20 +2907,16 @@
                     {
                         "name": "per_page",
                         "in": "query",
-                        "description": "Items per page (max 100)",
                         "schema": {
                             "type": "integer",
-                            "default": 100,
-                            "maximum": 100
+                            "default": 100
                         }
                     },
                     {
                         "name": "sort",
                         "in": "query",
-                        "description": "Sort field and direction",
                         "schema": {
                             "type": "string",
-                            "default": "name",
                             "enum": [
                                 "name",
                                 "-name",
@@ -2522,7 +2928,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Paginated tags list with contact count",
+                        "description": "Paginated tags list",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2530,20 +2936,25 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/components/schemas/Tag"
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "name": {
+                                                        "type": "string"
+                                                    },
+                                                    "contacts_count": {
+                                                        "type": "integer"
+                                                    }
+                                                },
+                                                "type": "object"
                                             }
-                                        },
-                                        "meta": {
-                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
                                 }
                             }
                         }
-                    },
-                    "401": {
-                        "description": "Unauthenticated"
                     }
                 },
                 "security": [
@@ -2580,17 +2991,28 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Tag created successfully",
+                        "description": "Tag created",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Tag"
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "contacts_count": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "type": "object"
                                 }
                             }
                         }
                     },
                     "422": {
-                        "description": "Validation error or duplicate tag name"
+                        "description": "Validation error"
                     }
                 },
                 "security": [
@@ -2628,8 +3050,7 @@
                                 "properties": {
                                     "name": {
                                         "type": "string",
-                                        "maxLength": 100,
-                                        "example": "Important"
+                                        "maxLength": 100
                                     }
                                 },
                                 "type": "object"
@@ -2639,20 +3060,25 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Tag updated successfully",
+                        "description": "Tag updated",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Tag"
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "contacts_count": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "type": "object"
                                 }
                             }
                         }
-                    },
-                    "403": {
-                        "description": "Forbidden - Not tag owner"
-                    },
-                    "422": {
-                        "description": "Validation error or duplicate tag name"
                     }
                 },
                 "security": [
@@ -2679,13 +3105,7 @@
                 ],
                 "responses": {
                     "204": {
-                        "description": "Tag deleted successfully"
-                    },
-                    "403": {
-                        "description": "Forbidden - Not tag owner"
-                    },
-                    "404": {
-                        "description": "Tag not found"
+                        "description": "Tag deleted"
                     }
                 },
                 "security": [
@@ -2698,197 +3118,6 @@
     },
     "components": {
         "schemas": {
-            "Contact": {
-                "properties": {
-                    "id": {
-                        "type": "integer"
-                    },
-                    "name": {
-                        "type": "string"
-                    },
-                    "company": {
-                        "type": "string"
-                    },
-                    "job_title": {
-                        "type": "string"
-                    },
-                    "email": {
-                        "type": "string"
-                    },
-                    "phone": {
-                        "type": "string"
-                    },
-                    "address": {
-                        "type": "string"
-                    },
-                    "notes": {
-                        "type": "string"
-                    },
-                    "linkedin_url": {
-                        "type": "string"
-                    },
-                    "website_url": {
-                        "type": "string"
-                    },
-                    "owner_user_id": {
-                        "type": "integer"
-                    },
-                    "tags": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/Tag"
-                        }
-                    },
-                    "created_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "updated_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    }
-                },
-                "type": "object"
-            },
-            "Tag": {
-                "properties": {
-                    "id": {
-                        "type": "integer"
-                    },
-                    "name": {
-                        "type": "string"
-                    },
-                    "owner_user_id": {
-                        "type": "integer"
-                    },
-                    "created_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    }
-                },
-                "type": "object"
-            },
-            "User": {
-                "properties": {
-                    "id": {
-                        "type": "integer"
-                    },
-                    "name": {
-                        "type": "string"
-                    },
-                    "email": {
-                        "type": "string"
-                    },
-                    "email_verified_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "created_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "updated_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    }
-                },
-                "type": "object"
-            },
-            "Reminder": {
-                "properties": {
-                    "id": {
-                        "type": "integer"
-                    },
-                    "title": {
-                        "type": "string"
-                    },
-                    "note": {
-                        "type": "string"
-                    },
-                    "due_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "status": {
-                        "type": "string",
-                        "enum": [
-                            "pending",
-                            "done",
-                            "skipped",
-                            "cancelled"
-                        ]
-                    },
-                    "channel": {
-                        "type": "string",
-                        "enum": [
-                            "app",
-                            "email",
-                            "calendar"
-                        ]
-                    },
-                    "contact_id": {
-                        "type": "integer"
-                    },
-                    "owner_user_id": {
-                        "type": "integer"
-                    },
-                    "contacts": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/Contact"
-                        }
-                    },
-                    "created_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "updated_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    }
-                },
-                "type": "object"
-            },
-            "UserNotification": {
-                "properties": {
-                    "id": {
-                        "type": "integer"
-                    },
-                    "type": {
-                        "type": "string"
-                    },
-                    "title": {
-                        "type": "string"
-                    },
-                    "body": {
-                        "type": "string"
-                    },
-                    "status": {
-                        "type": "string",
-                        "enum": [
-                            "unread",
-                            "read",
-                            "done"
-                        ]
-                    },
-                    "scheduled_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "read_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "owner_user_id": {
-                        "type": "integer"
-                    },
-                    "created_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    }
-                },
-                "type": "object"
-            },
             "BusinessCard": {
                 "title": "Business Card",
                 "required": [
@@ -2931,31 +3160,11 @@
                     "website": {
                         "type": "string"
                     },
-                    "address": {
-                        "type": "string"
-                    },
-                    "linkedin": {
-                        "type": "string"
-                    },
-                    "facebook": {
-                        "type": "string"
-                    },
-                    "twitter": {
-                        "type": "string"
-                    },
                     "avatar": {
                         "type": "string"
                     },
                     "notes": {
                         "type": "string"
-                    },
-                    "created_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "updated_at": {
-                        "type": "string",
-                        "format": "date-time"
                     },
                     "slug": {
                         "type": "string",
@@ -2968,6 +3177,30 @@
                     "view_count": {
                         "type": "integer",
                         "example": 42
+                    },
+                    "address": {
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "address_detail": {
+                                "type": "string"
+                            },
+                            "city_id": {
+                                "type": "integer",
+                                "nullable": true
+                            },
+                            "state_id": {
+                                "type": "integer",
+                                "nullable": true
+                            },
+                            "country_id": {
+                                "type": "integer",
+                                "nullable": true
+                            }
+                        },
+                        "type": "object",
+                        "nullable": true
                     }
                 },
                 "type": "object"
@@ -2982,66 +3215,37 @@
                         "type": "integer",
                         "example": 1
                     },
-                    "user_id": {
-                        "type": "integer",
-                        "example": 1
-                    },
                     "name": {
                         "type": "string",
                         "example": "Tech Corp"
                     },
-                    "domain": {
+                    "tax_code": {
                         "type": "string",
-                        "example": "techcorp.com"
-                    },
-                    "industry": {
-                        "type": "string",
-                        "example": "Technology"
-                    },
-                    "description": {
-                        "type": "string"
-                    },
-                    "website": {
-                        "type": "string",
-                        "example": "https://techcorp.com"
-                    },
-                    "email": {
-                        "type": "string",
-                        "example": "info@techcorp.com"
+                        "nullable": true
                     },
                     "phone": {
                         "type": "string",
-                        "example": "+1234567890"
+                        "nullable": true
                     },
-                    "address": {
-                        "type": "string"
-                    },
-                    "city": {
+                    "email": {
                         "type": "string",
-                        "example": "San Francisco"
+                        "nullable": true
                     },
-                    "country": {
+                    "website": {
                         "type": "string",
-                        "example": "USA"
+                        "nullable": true
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true
                     },
                     "logo": {
-                        "type": "string"
-                    },
-                    "plan": {
                         "type": "string",
-                        "example": "free"
+                        "nullable": true
                     },
-                    "status": {
-                        "type": "string",
-                        "example": "active"
-                    },
-                    "created_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "updated_at": {
-                        "type": "string",
-                        "format": "date-time"
+                    "address_id": {
+                        "type": "integer",
+                        "nullable": true
                     }
                 },
                 "type": "object"
@@ -3050,8 +3254,7 @@
         "securitySchemes": {
             "bearerAuth": {
                 "type": "http",
-                "description": "Enter your Bearer token in the format: Bearer {token}",
-                "bearerFormat": "Sanctum",
+                "bearerFormat": "JWT",
                 "scheme": "bearer"
             }
         }
@@ -3062,8 +3265,8 @@
             "description": "Authentication"
         },
         {
-            "name": "User",
-            "description": "User"
+            "name": "Auth",
+            "description": "Auth"
         },
         {
             "name": "Email Verification",
@@ -3074,12 +3277,12 @@
             "description": "Password Reset"
         },
         {
-            "name": "Business Card",
-            "description": "Business Card"
+            "name": "User",
+            "description": "User"
         },
         {
-            "name": "Company",
-            "description": "Company"
+            "name": "Business Card",
+            "description": "Business Card"
         },
         {
             "name": "Contacts",
@@ -3088,6 +3291,10 @@
         {
             "name": "Contact Tags",
             "description": "Contact Tags"
+        },
+        {
+            "name": "Locations",
+            "description": "Locations"
         },
         {
             "name": "Notifications",

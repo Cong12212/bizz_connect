@@ -19,31 +19,33 @@ class ContactController extends Controller
 {
     /**
      * @OA\Get(
-     *     path="/api/contacts",
-     *     tags={"Contacts"},
-     *     summary="Get contacts list with filters",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="q", in="query", description="Search term (supports #hashtags)", @OA\Schema(type="string")),
-     *     @OA\Parameter(name="tag_ids", in="query", description="Filter by tag IDs (comma-separated)", @OA\Schema(type="string")),
-     *     @OA\Parameter(name="tags", in="query", description="Filter by tag names (comma-separated)", @OA\Schema(type="string")),
-     *     @OA\Parameter(name="tag_mode", in="query", description="Tag matching mode", @OA\Schema(type="string", enum={"any", "all"}, default="any")),
-     *     @OA\Parameter(name="without_tag", in="query", description="Exclude contacts with this tag (ID or name)", @OA\Schema(type="string")),
-     *     @OA\Parameter(name="with_reminder", in="query", description="Filter contacts with reminders", @OA\Schema(type="boolean")),
-     *     @OA\Parameter(name="without_reminder", in="query", description="Filter contacts without reminders", @OA\Schema(type="boolean")),
-     *     @OA\Parameter(name="status", in="query", description="Reminder status filter", @OA\Schema(type="string")),
-     *     @OA\Parameter(name="after", in="query", description="Reminder due after date", @OA\Schema(type="string", format="date")),
-     *     @OA\Parameter(name="before", in="query", description="Reminder due before date", @OA\Schema(type="string", format="date")),
-     *     @OA\Parameter(name="exclude_ids", in="query", description="Exclude contact IDs (comma-separated)", @OA\Schema(type="string")),
-     *     @OA\Parameter(name="sort", in="query", description="Sort field", @OA\Schema(type="string", enum={"name", "-name", "id", "-id"}, default="-id")),
-     *     @OA\Parameter(name="per_page", in="query", description="Items per page (max 100)", @OA\Schema(type="integer", default=20)),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Paginated contacts list",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Contact")),
-     *             @OA\Property(property="meta", type="object")
-     *         )
+     *   path="/api/contacts",
+     *   tags={"Contacts"},
+     *   summary="List contacts",
+     *   security={{"bearerAuth":{}}},
+     *   @OA\Parameter(name="q", in="query", @OA\Schema(type="string")),
+     *   @OA\Parameter(name="tag", in="query", @OA\Schema(type="string")),
+     *   @OA\Parameter(name="page", in="query", @OA\Schema(type="integer")),
+     *   @OA\Parameter(name="per_page", in="query", @OA\Schema(type="integer")),
+     *   @OA\Response(
+     *     response=200,
+     *     description="Contacts list",
+     *     @OA\JsonContent(
+     *       type="object",
+     *       @OA\Property(property="data", type="array", @OA\Items(
+     *         type="object",
+     *         @OA\Property(property="id", type="integer"),
+     *         @OA\Property(property="name", type="string"),
+     *         @OA\Property(property="email", type="string", nullable=true),
+     *         @OA\Property(property="phone", type="string", nullable=true),
+     *         @OA\Property(property="company", type="string", nullable=true),
+     *         @OA\Property(property="job_title", type="string", nullable=true)
+     *       )),
+     *       @OA\Property(property="current_page", type="integer"),
+     *       @OA\Property(property="total", type="integer"),
+     *       @OA\Property(property="per_page", type="integer")
      *     )
+     *   )
      * )
      */
     public function index(Request $r)
@@ -199,20 +201,28 @@ class ContactController extends Controller
      *             @OA\Property(property="job_title", type="string", maxLength=255, example="CEO"),
      *             @OA\Property(property="email", type="string", format="email", maxLength=255, example="john@example.com"),
      *             @OA\Property(property="phone", type="string", maxLength=50, example="+1234567890"),
-     *             @OA\Property(property="address", type="string", maxLength=255, example="123 Main St"),
+     *             @OA\Property(property="address_detail", type="string", maxLength=255),
+     *             @OA\Property(property="city", type="string", maxLength=20),
+     *             @OA\Property(property="state", type="string", maxLength=20),
+     *             @OA\Property(property="country", type="string", maxLength=10),
      *             @OA\Property(property="notes", type="string", example="Important client"),
      *             @OA\Property(property="linkedin_url", type="string", format="url", maxLength=255),
-     *             @OA\Property(property="website_url", type="string", format="url", maxLength=255),
-     *             @OA\Property(property="ocr_raw", type="string", description="Raw OCR text from business card"),
-     *             @OA\Property(property="duplicate_of_id", type="integer", description="ID of original contact if duplicate"),
-     *             @OA\Property(property="search_text", type="string", description="Additional searchable text"),
-     *             @OA\Property(property="source", type="string", maxLength=50, example="manual", description="Contact source")
+     *             @OA\Property(property="website_url", type="string", format="url", maxLength=255)
      *         )
      *     ),
      *     @OA\Response(
      *         response=201,
      *         description="Contact created successfully",
-     *         @OA\JsonContent(@OA\Property(property="data", ref="#/components/schemas/Contact"))
+     *         @OA\JsonContent(
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="id", type="integer"),
+     *                 @OA\Property(property="name", type="string"),
+     *                 @OA\Property(property="email", type="string", nullable=true),
+     *                 @OA\Property(property="phone", type="string", nullable=true),
+     *                 @OA\Property(property="company", type="string", nullable=true),
+     *                 @OA\Property(property="job_title", type="string", nullable=true)
+     *             )
+     *         )
      *     ),
      *     @OA\Response(response=422, description="Validation error")
      * )
@@ -285,25 +295,38 @@ class ContactController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/contacts/{contact}",
-     *     tags={"Contacts"},
-     *     summary="Get a specific contact",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="contact", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Contact details",
-     *         @OA\JsonContent(@OA\Property(property="data", ref="#/components/schemas/Contact"))
-     *     ),
-     *     @OA\Response(response=403, description="Forbidden"),
-     *     @OA\Response(response=404, description="Contact not found")
+     *   path="/api/contacts/{id}",
+     *   tags={"Contacts"},
+     *   summary="Get contact details",
+     *   security={{"bearerAuth":{}}},
+     *   @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *   @OA\Response(
+     *     response=200,
+     *     description="Contact found",
+     *     @OA\JsonContent(
+     *       type="object",
+     *       @OA\Property(property="id", type="integer"),
+     *       @OA\Property(property="name", type="string"),
+     *       @OA\Property(property="email", type="string", nullable=true),
+     *       @OA\Property(property="phone", type="string", nullable=true),
+     *       @OA\Property(property="company", type="string", nullable=true),
+     *       @OA\Property(property="job_title", type="string", nullable=true),
+     *       @OA\Property(property="notes", type="string", nullable=true)
+     *     )
+     *   ),
+     *   @OA\Response(response=404, description="Not found")
      * )
      */
     public function show(Request $r, Contact $contact)
     {
         $this->authorizeOwner($r, $contact);
         $uid = $r->user()->id;
-        $contact->load(['tags' => fn($t) => $t->where('tags.owner_user_id', $uid), 'address']);
+        $contact->load([
+            'tags' => fn($t) => $t->where('tags.owner_user_id', $uid),
+            'address.city',
+            'address.state',
+            'address.country'
+        ]);
         return ['data' => $contact];
     }
 
@@ -321,20 +344,25 @@ class ContactController extends Controller
      *             @OA\Property(property="job_title", type="string", maxLength=255),
      *             @OA\Property(property="email", type="string", format="email", maxLength=255),
      *             @OA\Property(property="phone", type="string", maxLength=50),
-     *             @OA\Property(property="address", type="string", maxLength=255),
+     *             @OA\Property(property="address_detail", type="string", maxLength=255),
      *             @OA\Property(property="notes", type="string"),
      *             @OA\Property(property="linkedin_url", type="string", format="url", maxLength=255),
-     *             @OA\Property(property="website_url", type="string", format="url", maxLength=255),
-     *             @OA\Property(property="duplicate_of_id", type="integer"),
-     *             @OA\Property(property="source", type="string", maxLength=50)
+     *             @OA\Property(property="website_url", type="string", format="url", maxLength=255)
      *         )
      *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Contact updated successfully",
-     *         @OA\JsonContent(@OA\Property(property="data", ref="#/components/schemas/Contact"))
+     *         @OA\JsonContent(
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="id", type="integer"),
+     *                 @OA\Property(property="name", type="string"),
+     *                 @OA\Property(property="email", type="string", nullable=true),
+     *                 @OA\Property(property="phone", type="string", nullable=true)
+     *             )
+     *         )
      *     ),
-     *     @OA\Response(response=422, description="Validation error or circular duplicate")
+     *     @OA\Response(response=422, description="Validation error")
      * )
      */
     public function update(Request $request, Contact $contact)
@@ -446,14 +474,23 @@ class ContactController extends Controller
      *     @OA\Parameter(name="contact", in="path", required=true, @OA\Schema(type="integer")),
      *     @OA\RequestBody(
      *         @OA\JsonContent(
-     *             @OA\Property(property="ids", type="array", @OA\Items(type="integer"), description="Tag IDs to attach"),
-     *             @OA\Property(property="names", type="array", @OA\Items(type="string"), description="Tag names to attach (will be created if not exist)")
+     *             @OA\Property(property="ids", type="array", @OA\Items(type="integer")),
+     *             @OA\Property(property="names", type="array", @OA\Items(type="string"))
      *         )
      *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Tags attached successfully",
-     *         @OA\JsonContent(ref="#/components/schemas/Contact")
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="id", type="integer"),
+     *             @OA\Property(property="name", type="string"),
+     *             @OA\Property(property="tags", type="array", @OA\Items(
+     *                 type="object",
+     *                 @OA\Property(property="id", type="integer"),
+     *                 @OA\Property(property="name", type="string")
+     *             ))
+     *         )
      *     )
      * )
      */
@@ -507,9 +544,12 @@ class ContactController extends Controller
      *     @OA\Response(
      *         response=200,
      *         description="Tag detached successfully",
-     *         @OA\JsonContent(ref="#/components/schemas/Contact")
-     *     ),
-     *     @OA\Response(response=403, description="Forbidden")
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="id", type="integer"),
+     *             @OA\Property(property="name", type="string")
+     *         )
+     *     )
      * )
      */
     public function detachTag(Request $r, Contact $contact, Tag $tag)

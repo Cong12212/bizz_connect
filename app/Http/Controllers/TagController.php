@@ -13,33 +13,21 @@ class TagController extends Controller
      *     tags={"Tags"},
      *     summary="Get tags list with filters",
      *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="q",
-     *         in="query",
-     *         description="Search term (supports # prefix)",
-     *         @OA\Schema(type="string")
-     *     ),
-     *     @OA\Parameter(
-     *         name="per_page",
-     *         in="query",
-     *         description="Items per page (max 100)",
-     *         @OA\Schema(type="integer", default=100, maximum=100)
-     *     ),
-     *     @OA\Parameter(
-     *         name="sort",
-     *         in="query",
-     *         description="Sort field and direction",
-     *         @OA\Schema(type="string", enum={"name", "-name", "count", "-count"}, default="name")
-     *     ),
+     *     @OA\Parameter(name="q", in="query", description="Search term", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="per_page", in="query", @OA\Schema(type="integer", default=100)),
+     *     @OA\Parameter(name="sort", in="query", @OA\Schema(type="string", enum={"name", "-name", "count", "-count"})),
      *     @OA\Response(
      *         response=200,
-     *         description="Paginated tags list with contact count",
+     *         description="Paginated tags list",
      *         @OA\JsonContent(
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Tag")),
-     *             @OA\Property(property="meta", type="object")
+     *             @OA\Property(property="data", type="array", @OA\Items(
+     *                 type="object",
+     *                 @OA\Property(property="id", type="integer"),
+     *                 @OA\Property(property="name", type="string"),
+     *                 @OA\Property(property="contacts_count", type="integer")
+     *             ))
      *         )
-     *     ),
-     *     @OA\Response(response=401, description="Unauthenticated")
+     *     )
      * )
      */
     public function index(Request $r)
@@ -57,10 +45,10 @@ class TagController extends Controller
         // sort by name or number of contacts
         $sort = (string) $r->query('sort', 'name');    // name|-name|count|-count
         $sort === 'name'   ? $q->orderBy('name')
-      : ($sort === '-name' ? $q->orderBy('name', 'desc')
-      : ($sort === 'count' ? $q->orderBy('contacts_count', 'asc')
-      : ($sort === '-count'? $q->orderBy('contacts_count', 'desc')
-                           : $q->orderBy('name'))));
+            : ($sort === '-name' ? $q->orderBy('name', 'desc')
+                : ($sort === 'count' ? $q->orderBy('contacts_count', 'asc')
+                    : ($sort === '-count' ? $q->orderBy('contacts_count', 'desc')
+                        : $q->orderBy('name'))));
 
         return $q->paginate($per);
     }
@@ -80,10 +68,15 @@ class TagController extends Controller
      *     ),
      *     @OA\Response(
      *         response=201,
-     *         description="Tag created successfully",
-     *         @OA\JsonContent(ref="#/components/schemas/Tag")
+     *         description="Tag created",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="id", type="integer"),
+     *             @OA\Property(property="name", type="string"),
+     *             @OA\Property(property="contacts_count", type="integer")
+     *         )
      *     ),
-     *     @OA\Response(response=422, description="Validation error or duplicate tag name")
+     *     @OA\Response(response=422, description="Validation error")
      * )
      */
     public function store(Request $r)
@@ -111,26 +104,24 @@ class TagController extends Controller
      *     tags={"Tags"},
      *     summary="Update a tag",
      *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="tag",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
+     *     @OA\Parameter(name="tag", in="path", required=true, @OA\Schema(type="integer")),
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
      *             required={"name"},
-     *             @OA\Property(property="name", type="string", maxLength=100, example="Important")
+     *             @OA\Property(property="name", type="string", maxLength=100)
      *         )
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Tag updated successfully",
-     *         @OA\JsonContent(ref="#/components/schemas/Tag")
-     *     ),
-     *     @OA\Response(response=403, description="Forbidden - Not tag owner"),
-     *     @OA\Response(response=422, description="Validation error or duplicate tag name")
+     *         description="Tag updated",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="id", type="integer"),
+     *             @OA\Property(property="name", type="string"),
+     *             @OA\Property(property="contacts_count", type="integer")
+     *         )
+     *     )
      * )
      */
     public function update(Request $r, Tag $tag)
@@ -158,15 +149,8 @@ class TagController extends Controller
      *     tags={"Tags"},
      *     summary="Delete a tag",
      *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="tag",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(response=204, description="Tag deleted successfully"),
-     *     @OA\Response(response=403, description="Forbidden - Not tag owner"),
-     *     @OA\Response(response=404, description="Tag not found")
+     *     @OA\Parameter(name="tag", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(response=204, description="Tag deleted")
      * )
      */
     public function destroy(Request $r, Tag $tag)

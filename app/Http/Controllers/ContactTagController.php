@@ -40,7 +40,19 @@ class ContactTagController extends Controller
      *     @OA\Response(
      *         response=200,
      *         description="Tags attached successfully",
-     *         @OA\JsonContent(ref="#/components/schemas/Contact")
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="contact", type="object",
+     *                 @OA\Property(property="id", type="integer"),
+     *                 @OA\Property(property="name", type="string")
+     *             ),
+     *             @OA\Property(property="tags", type="array",
+     *                 @OA\Items(type="object",
+     *                     @OA\Property(property="id", type="integer"),
+     *                     @OA\Property(property="name", type="string")
+     *                 )
+     *             )
+     *         )
      *     ),
      *     @OA\Response(response=403, description="Forbidden - Not contact owner"),
      *     @OA\Response(response=404, description="Contact not found"),
@@ -97,7 +109,19 @@ class ContactTagController extends Controller
      *     @OA\Response(
      *         response=200,
      *         description="Tag detached successfully",
-     *         @OA\JsonContent(ref="#/components/schemas/Contact")
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="contact", type="object",
+     *                 @OA\Property(property="id", type="integer"),
+     *                 @OA\Property(property="name", type="string")
+     *             ),
+     *             @OA\Property(property="tags", type="array",
+     *                 @OA\Items(type="object",
+     *                     @OA\Property(property="id", type="integer"),
+     *                     @OA\Property(property="name", type="string")
+     *                 )
+     *             )
+     *         )
      *     ),
      *     @OA\Response(response=403, description="Forbidden - Not contact owner"),
      *     @OA\Response(response=404, description="Contact or tag not found")

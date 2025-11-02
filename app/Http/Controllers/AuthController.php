@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\URL;
@@ -10,7 +11,6 @@ use Illuminate\Auth\Events\Verified;
 use App\Notifications\PasswordResetCode;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use App\Models\User;
 
 class AuthController extends Controller
 {
@@ -110,20 +110,30 @@ class AuthController extends Controller
     /**
      * @OA\Get(
      *     path="/api/auth/me",
-     *     tags={"User"},
-     *     summary="Get current user",
+     *     tags={"Auth"},
+     *     summary="Get current user info",
      *     security={{"bearerAuth":{}}},
      *     @OA\Response(
      *         response=200,
-     *         description="Current user data",
-     *         @OA\JsonContent(ref="#/components/schemas/User")
+     *         description="Current user",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="id", type="integer", example=1),
+     *             @OA\Property(property="name", type="string", example="John Doe"),
+     *             @OA\Property(property="email", type="string", example="john@example.com"),
+     *             @OA\Property(property="phone", type="string", nullable=true, example="+84123456789"),
+     *             @OA\Property(property="avatar_url", type="string", nullable=true),
+     *             @OA\Property(property="verified", type="boolean", example=true),
+     *             @OA\Property(property="created_at", type="string", format="date-time"),
+     *             @OA\Property(property="updated_at", type="string", format="date-time")
+     *         )
      *     ),
-     *     @OA\Response(response=401, description="Unauthenticated")
+     *     @OA\Response(response=401, description="Unauthorized")
      * )
      */
-    public function me(Request $r)
+    public function me(Request $request)
     {
-        return $r->user();
+        return response()->json($request->user());
     }
 
     /**
