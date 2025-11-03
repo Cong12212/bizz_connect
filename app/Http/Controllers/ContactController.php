@@ -88,7 +88,13 @@ class ContactController extends Controller
         }
 
         if (!empty($tagIds) || !empty($tagNames)) {
-            $mode = $r->query('tag_mode', 'any'); // any|all
+            // THAY ĐỔI: Tự động chuyển sang 'all' nếu có nhiều hashtag từ query string
+            $mode = $r->query('tag_mode');
+            if (!$mode && count($hashTagNames) > 1) {
+                $mode = 'all'; // Auto AND mode khi search nhiều #tags
+            }
+            $mode = $mode ?: 'any';
+
             if (!empty($tagIds)) {
                 if ($mode === 'all') {
                     foreach ($tagIds as $id) {
@@ -101,10 +107,16 @@ class ContactController extends Controller
             if (!empty($tagNames)) {
                 if ($mode === 'all') {
                     foreach ($tagNames as $name) {
-                        $q->whereHas('tags', fn($t) => $t->where('tags.name', $name));
+                        $q->whereHas('tags', fn($t) => $t->where('tags.name', 'like', "%{$name}%"));
                     }
                 } else {
-                    $q->whereHas('tags', fn($t) => $t->whereIn('tags.name', $tagNames));
+                    $q->whereHas('tags', function ($t) use ($tagNames) {
+                        $t->where(function ($sub) use ($tagNames) {
+                            foreach ($tagNames as $name) {
+                                $sub->orWhere('tags.name', 'like', "%{$name}%");
+                            }
+                        });
+                    });
                 }
             }
         }
@@ -116,7 +128,8 @@ class ContactController extends Controller
                 if (is_numeric($val)) {
                     $t->where('tags.id', (int)$val);
                 } else {
-                    $t->where('tags.name', ltrim((string)$val, '#'));
+                    // Thay đổi: search LIKE
+                    $t->where('tags.name', 'like', '%' . ltrim((string)$val, '#') . '%');
                 }
             });
         }
@@ -651,7 +664,13 @@ class ContactController extends Controller
         }
 
         if (!empty($tagIds) || !empty($tagNames)) {
-            $mode = $r->query('tag_mode', 'any');
+            // THAY ĐỔI: Tự động chuyển sang 'all' nếu có nhiều hashtag từ query string
+            $mode = $r->query('tag_mode');
+            if (!$mode && count($hashTagNames) > 1) {
+                $mode = 'all';
+            }
+            $mode = $mode ?: 'any';
+
             if (!empty($tagIds)) {
                 if ($mode === 'all') {
                     foreach ($tagIds as $id) {
@@ -664,10 +683,16 @@ class ContactController extends Controller
             if (!empty($tagNames)) {
                 if ($mode === 'all') {
                     foreach ($tagNames as $name) {
-                        $query->whereHas('tags', fn($t) => $t->where('tags.name', $name));
+                        $query->whereHas('tags', fn($t) => $t->where('tags.name', 'like', "%{$name}%"));
                     }
                 } else {
-                    $query->whereHas('tags', fn($t) => $t->whereIn('tags.name', $tagNames));
+                    $query->whereHas('tags', function ($t) use ($tagNames) {
+                        $t->where(function ($sub) use ($tagNames) {
+                            foreach ($tagNames as $name) {
+                                $sub->orWhere('tags.name', 'like', "%{$name}%");
+                            }
+                        });
+                    });
                 }
             }
         }
@@ -676,8 +701,12 @@ class ContactController extends Controller
         if ($r->filled('without_tag')) {
             $val = $r->query('without_tag');
             $query->whereDoesntHave('tags', function ($t) use ($val) {
-                if (is_numeric($val)) $t->where('tags.id', (int) $val);
-                else $t->where('tags.name', ltrim((string)$val, '#'));
+                if (is_numeric($val)) {
+                    $t->where('tags.id', (int) $val);
+                } else {
+                    // Thay đổi: search LIKE
+                    $t->where('tags.name', 'like', '%' . ltrim((string)$val, '#') . '%');
+                }
             });
         }
 
