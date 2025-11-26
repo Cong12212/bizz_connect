@@ -8,10 +8,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Drop nếu tồn tại rồi
-        Schema::dropIfExists('business_cards');
-
-        // Tạo mới
         Schema::create('business_cards', function (Blueprint $table) {
             $table->id();
             $table->string('slug')->unique()->nullable();
@@ -24,7 +20,7 @@ return new class extends Migration
             $table->string('phone')->nullable();
             $table->string('mobile')->nullable();
             $table->string('website')->nullable();
-            $table->text('address')->nullable();
+            $table->foreignId('address_id')->nullable()->constrained('addresses')->onDelete('set null');
             $table->string('linkedin')->nullable();
             $table->string('facebook')->nullable();
             $table->string('twitter')->nullable();
@@ -33,6 +29,7 @@ return new class extends Migration
             $table->boolean('is_public')->default(true);
             $table->integer('view_count')->default(0);
             $table->timestamps();
+            $table->softDeletes();
             $table->index(['user_id', 'company_id', 'email']);
         });
     }

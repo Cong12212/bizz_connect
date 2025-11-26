@@ -8,27 +8,19 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * @OA\Schema(
- *     schema="Company",
- *     type="object",
- *     title="Company",
- *     required={"name"},
- *     @OA\Property(property="id", type="integer", example=1),
- *     @OA\Property(property="user_id", type="integer", example=1),
- *     @OA\Property(property="name", type="string", example="Tech Corp"),
- *     @OA\Property(property="domain", type="string", example="techcorp.com"),
- *     @OA\Property(property="industry", type="string", example="Technology"),
- *     @OA\Property(property="description", type="string"),
- *     @OA\Property(property="website", type="string", example="https://techcorp.com"),
- *     @OA\Property(property="email", type="string", example="info@techcorp.com"),
- *     @OA\Property(property="phone", type="string", example="+1234567890"),
- *     @OA\Property(property="address", type="string"),
- *     @OA\Property(property="city", type="string", example="San Francisco"),
- *     @OA\Property(property="country", type="string", example="USA"),
- *     @OA\Property(property="logo", type="string"),
- *     @OA\Property(property="plan", type="string", example="free"),
- *     @OA\Property(property="status", type="string", example="active"),
- *     @OA\Property(property="created_at", type="string", format="date-time"),
- *     @OA\Property(property="updated_at", type="string", format="date-time")
+ *   schema="Company",
+ *   type="object",
+ *   title="Company",
+ *   required={"name"},
+ *   @OA\Property(property="id", type="integer", example=1),
+ *   @OA\Property(property="name", type="string", example="Tech Corp"),
+ *   @OA\Property(property="tax_code", type="string", nullable=true),
+ *   @OA\Property(property="phone", type="string", nullable=true),
+ *   @OA\Property(property="email", type="string", nullable=true),
+ *   @OA\Property(property="website", type="string", nullable=true),
+ *   @OA\Property(property="description", type="string", nullable=true),
+ *   @OA\Property(property="logo", type="string", nullable=true),
+ *   @OA\Property(property="address_id", type="integer", nullable=true)
  * )
  */
 class Company extends Model
@@ -36,33 +28,24 @@ class Company extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'user_id',
         'name',
-        'domain',
-        'industry',
-        'description',
-        'website',
-        'email',
+        'tax_code',
         'phone',
-        'address',
-        'address_line1',
-        'address_line2',
-        'city',
-        'state',
-        'country',
-        'postal_code',
+        'email',
+        'website',
+        'address_id',
+        'description',
         'logo',
-        'plan',
-        'status',
     ];
 
-    public function user()
+    public function address()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Address::class);
     }
 
-    public function businessCard()
+    // Nếu users.company_id trỏ về companies.id
+    public function users()
     {
-        return $this->hasOne(BusinessCard::class);
+        return $this->hasMany(User::class);
     }
 }

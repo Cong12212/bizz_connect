@@ -26,6 +26,9 @@ class User extends Authenticatable implements MustVerifyEmail
         'avatar_url',
         'locale',
         'timezone',
+        'company_id',
+        'business_card_id',
+        'address_id',
     ];
 
     protected $hidden = ['password', 'remember_token'];
@@ -54,11 +57,28 @@ class User extends Authenticatable implements MustVerifyEmail
     // 1-N: personal subscriptions (user_id
     public function company()
     {
-        return $this->hasOne(Company::class);
+        return $this->belongsTo(Company::class);
     }
 
     public function businessCard()
     {
-        return $this->hasOne(BusinessCard::class);
+        return $this->hasOne(BusinessCard::class, 'user_id');
+    }
+
+    public function addresses()
+    {
+        return $this->belongsToMany(Address::class, 'user_addresses')->withTimestamps();
+    }
+
+    public function getAddressByType($type = 'home')
+    {
+        return $this->addresses()
+            ->wherePivot('address_type_code', $type)
+            ->first();
+    }
+
+    public function address()
+    {
+        return $this->belongsTo(Address::class);
     }
 }

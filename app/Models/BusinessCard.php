@@ -22,17 +22,21 @@ use Illuminate\Support\Str;
  *     @OA\Property(property="phone", type="string"),
  *     @OA\Property(property="mobile", type="string"),
  *     @OA\Property(property="website", type="string"),
- *     @OA\Property(property="address", type="string"),
- *     @OA\Property(property="linkedin", type="string"),
- *     @OA\Property(property="facebook", type="string"),
- *     @OA\Property(property="twitter", type="string"),
  *     @OA\Property(property="avatar", type="string"),
  *     @OA\Property(property="notes", type="string"),
- *     @OA\Property(property="created_at", type="string", format="date-time"),
- *     @OA\Property(property="updated_at", type="string", format="date-time"),
  *     @OA\Property(property="slug", type="string", example="john-doe-tech-corp"),
  *     @OA\Property(property="is_public", type="boolean", example=true),
- *     @OA\Property(property="view_count", type="integer", example=42)
+ *     @OA\Property(property="view_count", type="integer", example=42),
+ *     @OA\Property(
+ *        property="address",
+ *        type="object",
+ *        nullable=true,
+ *        @OA\Property(property="id", type="integer"),
+ *        @OA\Property(property="address_detail", type="string"),
+ *        @OA\Property(property="city_id", type="integer", nullable=true),
+ *        @OA\Property(property="state_id", type="integer", nullable=true),
+ *        @OA\Property(property="country_id", type="integer", nullable=true),
+ *     )
  * )
  */
 class BusinessCard extends Model
@@ -50,23 +54,18 @@ class BusinessCard extends Model
         'phone',
         'mobile',
         'website',
-        'address',
-        'address_line1',
-        'address_line2',
-        'city',
-        'state',
-        'country',
-        'postal_code',
+        'address_id',
         'linkedin',
         'facebook',
         'twitter',
         'avatar',
         'notes',
-        'is_public'
+        'is_public',
+        'view_count',
     ];
 
     protected $casts = [
-        'is_public' => 'boolean',
+        'is_public'  => 'boolean',
         'view_count' => 'integer',
     ];
 
@@ -89,11 +88,12 @@ class BusinessCard extends Model
 
     protected static function generateUniqueSlug($name)
     {
-        $slug = Str::slug($name);
+        $base = Str::slug($name) ?: 'card';
+        $slug = $base;
         $count = 1;
 
         while (static::where('slug', $slug)->exists()) {
-            $slug = Str::slug($name) . '-' . $count++;
+            $slug = $base . '-' . $count++;
         }
 
         return $slug;
@@ -109,8 +109,13 @@ class BusinessCard extends Model
         return $this->belongsTo(Company::class);
     }
 
+    public function address()
+    {
+        return $this->belongsTo(Address::class);
+    }
+
     public function getPublicUrlAttribute()
     {
-        return config('app.frontend_url') . '/card/' . $this->slug;
+        return rtrim(config('app.frontend_url'), '/') . '/card/' . $this->slug;
     }
 }

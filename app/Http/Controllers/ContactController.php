@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Contact;
+use App\Models\Address;
 use App\Models\Tag;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\ContactsExport;
@@ -17,31 +19,33 @@ class ContactController extends Controller
 {
     /**
      * @OA\Get(
-     *     path="/api/contacts",
-     *     tags={"Contacts"},
-     *     summary="Get contacts list with filters",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="q", in="query", description="Search term (supports #hashtags)", @OA\Schema(type="string")),
-     *     @OA\Parameter(name="tag_ids", in="query", description="Filter by tag IDs (comma-separated)", @OA\Schema(type="string")),
-     *     @OA\Parameter(name="tags", in="query", description="Filter by tag names (comma-separated)", @OA\Schema(type="string")),
-     *     @OA\Parameter(name="tag_mode", in="query", description="Tag matching mode", @OA\Schema(type="string", enum={"any", "all"}, default="any")),
-     *     @OA\Parameter(name="without_tag", in="query", description="Exclude contacts with this tag (ID or name)", @OA\Schema(type="string")),
-     *     @OA\Parameter(name="with_reminder", in="query", description="Filter contacts with reminders", @OA\Schema(type="boolean")),
-     *     @OA\Parameter(name="without_reminder", in="query", description="Filter contacts without reminders", @OA\Schema(type="boolean")),
-     *     @OA\Parameter(name="status", in="query", description="Reminder status filter", @OA\Schema(type="string")),
-     *     @OA\Parameter(name="after", in="query", description="Reminder due after date", @OA\Schema(type="string", format="date")),
-     *     @OA\Parameter(name="before", in="query", description="Reminder due before date", @OA\Schema(type="string", format="date")),
-     *     @OA\Parameter(name="exclude_ids", in="query", description="Exclude contact IDs (comma-separated)", @OA\Schema(type="string")),
-     *     @OA\Parameter(name="sort", in="query", description="Sort field", @OA\Schema(type="string", enum={"name", "-name", "id", "-id"}, default="-id")),
-     *     @OA\Parameter(name="per_page", in="query", description="Items per page (max 100)", @OA\Schema(type="integer", default=20)),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Paginated contacts list",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Contact")),
-     *             @OA\Property(property="meta", type="object")
-     *         )
+     *   path="/api/contacts",
+     *   tags={"Contacts"},
+     *   summary="List contacts",
+     *   security={{"bearerAuth":{}}},
+     *   @OA\Parameter(name="q", in="query", @OA\Schema(type="string")),
+     *   @OA\Parameter(name="tag", in="query", @OA\Schema(type="string")),
+     *   @OA\Parameter(name="page", in="query", @OA\Schema(type="integer")),
+     *   @OA\Parameter(name="per_page", in="query", @OA\Schema(type="integer")),
+     *   @OA\Response(
+     *     response=200,
+     *     description="Contacts list",
+     *     @OA\JsonContent(
+     *       type="object",
+     *       @OA\Property(property="data", type="array", @OA\Items(
+     *         type="object",
+     *         @OA\Property(property="id", type="integer"),
+     *         @OA\Property(property="name", type="string"),
+     *         @OA\Property(property="email", type="string", nullable=true),
+     *         @OA\Property(property="phone", type="string", nullable=true),
+     *         @OA\Property(property="company", type="string", nullable=true),
+     *         @OA\Property(property="job_title", type="string", nullable=true)
+     *       )),
+     *       @OA\Property(property="current_page", type="integer"),
+     *       @OA\Property(property="total", type="integer"),
+     *       @OA\Property(property="per_page", type="integer")
      *     )
+     *   )
      * )
      */
     public function index(Request $r)
@@ -84,7 +88,13 @@ class ContactController extends Controller
         }
 
         if (!empty($tagIds) || !empty($tagNames)) {
-            $mode = $r->query('tag_mode', 'any'); // any|all
+            // THAY ĐỔI: Tự động chuyển sang 'all' nếu có nhiều hashtag từ query string
+            $mode = $r->query('tag_mode');
+            if (!$mode && count($hashTagNames) > 1) {
+                $mode = 'all'; // Auto AND mode khi search nhiều #tags
+            }
+            $mode = $mode ?: 'any';
+
             if (!empty($tagIds)) {
                 if ($mode === 'all') {
                     foreach ($tagIds as $id) {
@@ -97,10 +107,16 @@ class ContactController extends Controller
             if (!empty($tagNames)) {
                 if ($mode === 'all') {
                     foreach ($tagNames as $name) {
-                        $q->whereHas('tags', fn($t) => $t->where('tags.name', $name));
+                        $q->whereHas('tags', fn($t) => $t->where('tags.name', 'like', "%{$name}%"));
                     }
                 } else {
-                    $q->whereHas('tags', fn($t) => $t->whereIn('tags.name', $tagNames));
+                    $q->whereHas('tags', function ($t) use ($tagNames) {
+                        $t->where(function ($sub) use ($tagNames) {
+                            foreach ($tagNames as $name) {
+                                $sub->orWhere('tags.name', 'like', "%{$name}%");
+                            }
+                        });
+                    });
                 }
             }
         }
@@ -112,7 +128,8 @@ class ContactController extends Controller
                 if (is_numeric($val)) {
                     $t->where('tags.id', (int)$val);
                 } else {
-                    $t->where('tags.name', ltrim((string)$val, '#'));
+                    // Thay đổi: search LIKE
+                    $t->where('tags.name', 'like', '%' . ltrim((string)$val, '#') . '%');
                 }
             });
         }
@@ -171,8 +188,13 @@ class ContactController extends Controller
                 : ($sort === 'id'    ? $q->orderBy('id')
                     : $q->orderBy('id', 'desc')));
 
-        // eager-load tags
-        $q->with(['tags' => fn($t) => $t->where('tags.owner_user_id', $r->user()->id)]);
+        // eager-load tags and address with relations
+        $q->with([
+            'tags' => fn($t) => $t->where('tags.owner_user_id', $r->user()->id),
+            'address.city',
+            'address.state',
+            'address.country'
+        ]);
 
         return $q->paginate($per);
     }
@@ -192,91 +214,132 @@ class ContactController extends Controller
      *             @OA\Property(property="job_title", type="string", maxLength=255, example="CEO"),
      *             @OA\Property(property="email", type="string", format="email", maxLength=255, example="john@example.com"),
      *             @OA\Property(property="phone", type="string", maxLength=50, example="+1234567890"),
-     *             @OA\Property(property="address", type="string", maxLength=255, example="123 Main St"),
+     *             @OA\Property(property="address_detail", type="string", maxLength=255),
+     *             @OA\Property(property="city", type="string", maxLength=20),
+     *             @OA\Property(property="state", type="string", maxLength=20),
+     *             @OA\Property(property="country", type="string", maxLength=10),
      *             @OA\Property(property="notes", type="string", example="Important client"),
      *             @OA\Property(property="linkedin_url", type="string", format="url", maxLength=255),
-     *             @OA\Property(property="website_url", type="string", format="url", maxLength=255),
-     *             @OA\Property(property="ocr_raw", type="string", description="Raw OCR text from business card"),
-     *             @OA\Property(property="duplicate_of_id", type="integer", description="ID of original contact if duplicate"),
-     *             @OA\Property(property="search_text", type="string", description="Additional searchable text"),
-     *             @OA\Property(property="source", type="string", maxLength=50, example="manual", description="Contact source")
+     *             @OA\Property(property="website_url", type="string", format="url", maxLength=255)
      *         )
      *     ),
      *     @OA\Response(
      *         response=201,
      *         description="Contact created successfully",
-     *         @OA\JsonContent(@OA\Property(property="data", ref="#/components/schemas/Contact"))
+     *         @OA\JsonContent(
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="id", type="integer"),
+     *                 @OA\Property(property="name", type="string"),
+     *                 @OA\Property(property="email", type="string", nullable=true),
+     *                 @OA\Property(property="phone", type="string", nullable=true),
+     *                 @OA\Property(property="company", type="string", nullable=true),
+     *                 @OA\Property(property="job_title", type="string", nullable=true)
+     *             )
+     *         )
      *     ),
      *     @OA\Response(response=422, description="Validation error")
      * )
      */
-    public function store(Request $r)
+    public function store(Request $request)
     {
-        $data = $r->validate([
-            'name'            => 'required|string|max:255',
-            'company'         => 'nullable|string|max:255',
-            'job_title'       => 'nullable|string|max:255',
-            'email'           => 'nullable|email|max:255',
-            'phone'           => 'nullable|string|max:50',
-            'address'         => 'nullable|string|max:255',
-            'address_line1'   => 'nullable|string|max:255',
-            'address_line2'   => 'nullable|string|max:255',
-            'city'            => 'nullable|string|max:255',
-            'state'           => 'nullable|string|max:255',
-            'country'         => 'nullable|string|max:255',
-            'postal_code'     => 'nullable|string|max:20',
-            'notes'           => 'nullable|string',
-            'linkedin_url'    => 'nullable|url|max:255',
-            'website_url'     => 'nullable|url|max:255',
-            'ocr_raw'         => 'nullable|string',
-            'duplicate_of_id' => [
-                'nullable',
-                'integer',
-                Rule::exists('contacts', 'id')->where(fn($q) => $q->where('owner_user_id', $r->user()->id)),
-            ],
-            'search_text'     => 'nullable|string',
-            'source'          => 'nullable|string|max:50',
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'company' => 'nullable|string|max:255',
+            'job_title' => 'nullable|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'phone' => 'nullable|string|max:50',
+            'address_detail' => 'nullable|string|max:255',
+            'city' => 'nullable|string|max:20',
+            'state' => 'nullable|string|max:20',
+            'country' => 'nullable|string|max:10',
+            'notes' => 'nullable|string',
+            'linkedin_url' => 'nullable|url|max:255',
+            'website_url' => 'nullable|url|max:255',
+            'ocr_raw' => 'nullable|string',
+            'duplicate_of_id' => ['nullable', 'integer', Rule::exists('contacts', 'id')->where(fn($q) => $q->where('owner_user_id', $request->user()->id))],
+            'search_text' => 'nullable|string',
+            'source' => 'nullable|string|max:50',
         ]);
 
-        $data['owner_user_id'] = $r->user()->id;
-        if (!isset($data['source']) || $data['source'] === null || $data['source'] === '') {
-            $data['source'] = 'manual';
+        // Tạo address nếu có thông tin
+        $addressId = null;
+        if ($request->filled('address_detail') || $request->filled('city')) {
+            // Lấy ID từ code
+            $cityId = $request->city ? DB::table('cities')->where('code', $request->city)->value('id') : null;
+            $stateId = $request->state ? DB::table('states')->where('code', $request->state)->value('id') : null;
+            $countryId = $request->country ? DB::table('countries')->where('code', $request->country)->value('id') : null;
+
+            $address = Address::create([
+                'address_detail' => $request->address_detail,
+                'city_id' => $cityId,
+                'state_id' => $stateId,
+                'country_id' => $countryId,
+            ]);
+            $addressId = $address->id;
         }
 
-        $c = Contact::create($data);
-
-        UserNotification::log($r->user()->id, [
-            'type'        => 'contact.created',
-            'title'       => 'New contact created',
-            'body'        => $c->name . ($c->company ? ' · ' . $c->company : ''),
-            'data'        => ['contact_id' => $c->id],
-            'contact_id'  => $c->id,
+        $contact = Contact::create([
+            'owner_user_id' => $request->user()->id,
+            'name' => $data['name'],
+            'company' => $data['company'] ?? null,
+            'job_title' => $data['job_title'] ?? null,
+            'email' => $data['email'] ?? null,
+            'phone' => $data['phone'] ?? null,
+            'address_id' => $addressId,
+            'notes' => $data['notes'] ?? null,
+            'linkedin_url' => $data['linkedin_url'] ?? null,
+            'website_url' => $data['website_url'] ?? null,
+            'ocr_raw' => $data['ocr_raw'] ?? null,
+            'duplicate_of_id' => $data['duplicate_of_id'] ?? null,
+            'search_text' => $data['search_text'] ?? null,
+            'source' => $data['source'] ?? 'manual',
         ]);
 
-        return response()->json(['data' => $c->load('tags')], 201);
+        UserNotification::log($request->user()->id, [
+            'type'        => 'contact.created',
+            'title'       => 'New contact created',
+            'body'        => $contact->name . ($contact->company ? ' · ' . $contact->company : ''),
+            'data'        => ['contact_id' => $contact->id],
+            'contact_id'  => $contact->id,
+        ]);
+
+        return response()->json(['data' => $contact->load(['tags', 'address.city', 'address.state', 'address.country'])], 201);
     }
 
     /**
      * @OA\Get(
-     *     path="/api/contacts/{contact}",
-     *     tags={"Contacts"},
-     *     summary="Get a specific contact",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="contact", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Contact details",
-     *         @OA\JsonContent(@OA\Property(property="data", ref="#/components/schemas/Contact"))
-     *     ),
-     *     @OA\Response(response=403, description="Forbidden"),
-     *     @OA\Response(response=404, description="Contact not found")
+     *   path="/api/contacts/{id}",
+     *   tags={"Contacts"},
+     *   summary="Get contact details",
+     *   security={{"bearerAuth":{}}},
+     *   @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *   @OA\Response(
+     *     response=200,
+     *     description="Contact found",
+     *     @OA\JsonContent(
+     *       type="object",
+     *       @OA\Property(property="id", type="integer"),
+     *       @OA\Property(property="name", type="string"),
+     *       @OA\Property(property="email", type="string", nullable=true),
+     *       @OA\Property(property="phone", type="string", nullable=true),
+     *       @OA\Property(property="company", type="string", nullable=true),
+     *       @OA\Property(property="job_title", type="string", nullable=true),
+     *       @OA\Property(property="notes", type="string", nullable=true)
+     *     )
+     *   ),
+     *   @OA\Response(response=404, description="Not found")
      * )
      */
     public function show(Request $r, Contact $contact)
     {
         $this->authorizeOwner($r, $contact);
         $uid = $r->user()->id;
-        $contact->load(['tags' => fn($t) => $t->where('tags.owner_user_id', $uid)]);
+        $contact->load([
+            'tags' => fn($t) => $t->where('tags.owner_user_id', $uid),
+            'address.city',
+            'address.state',
+            'address.country'
+        ]);
         return ['data' => $contact];
     }
 
@@ -294,39 +357,41 @@ class ContactController extends Controller
      *             @OA\Property(property="job_title", type="string", maxLength=255),
      *             @OA\Property(property="email", type="string", format="email", maxLength=255),
      *             @OA\Property(property="phone", type="string", maxLength=50),
-     *             @OA\Property(property="address", type="string", maxLength=255),
+     *             @OA\Property(property="address_detail", type="string", maxLength=255),
      *             @OA\Property(property="notes", type="string"),
      *             @OA\Property(property="linkedin_url", type="string", format="url", maxLength=255),
-     *             @OA\Property(property="website_url", type="string", format="url", maxLength=255),
-     *             @OA\Property(property="duplicate_of_id", type="integer"),
-     *             @OA\Property(property="source", type="string", maxLength=50)
+     *             @OA\Property(property="website_url", type="string", format="url", maxLength=255)
      *         )
      *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Contact updated successfully",
-     *         @OA\JsonContent(@OA\Property(property="data", ref="#/components/schemas/Contact"))
+     *         @OA\JsonContent(
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="id", type="integer"),
+     *                 @OA\Property(property="name", type="string"),
+     *                 @OA\Property(property="email", type="string", nullable=true),
+     *                 @OA\Property(property="phone", type="string", nullable=true)
+     *             )
+     *         )
      *     ),
-     *     @OA\Response(response=422, description="Validation error or circular duplicate")
+     *     @OA\Response(response=422, description="Validation error")
      * )
      */
-    public function update(Request $r, Contact $contact)
+    public function update(Request $request, Contact $contact)
     {
-        $this->authorizeOwner($r, $contact);
+        $this->authorizeOwner($request, $contact);
 
-        $payload = $r->validate([
+        $payload = $request->validate([
             'name'            => 'sometimes|required|string|max:255',
             'company'         => 'sometimes|nullable|string|max:255',
             'job_title'       => 'sometimes|nullable|string|max:255',
             'email'           => 'sometimes|nullable|email|max:255',
             'phone'           => 'sometimes|nullable|string|max:50',
-            'address'         => 'sometimes|nullable|string|max:255',
-            'address_line1'   => 'sometimes|nullable|string|max:255',
-            'address_line2'   => 'sometimes|nullable|string|max:255',
-            'city'            => 'sometimes|nullable|string|max:255',
-            'state'           => 'sometimes|nullable|string|max:255',
-            'country'         => 'sometimes|nullable|string|max:255',
-            'postal_code'     => 'sometimes|nullable|string|max:20',
+            'address_detail'  => 'sometimes|nullable|string|max:255',
+            'city'            => 'sometimes|nullable|string|max:20',
+            'state'           => 'sometimes|nullable|string|max:20',
+            'country'         => 'sometimes|nullable|string|max:10',
             'notes'           => 'sometimes|nullable|string',
             'linkedin_url'    => 'sometimes|nullable|url|max:255',
             'website_url'     => 'sometimes|nullable|url|max:255',
@@ -336,8 +401,7 @@ class ContactController extends Controller
                 'nullable',
                 'integer',
                 Rule::exists('contacts', 'id')->where(
-                    fn($q) =>
-                    $q->where('owner_user_id', $r->user()->id)
+                    fn($q) => $q->where('owner_user_id', $request->user()->id)
                 ),
                 Rule::notIn([$contact->id]),
             ],
@@ -348,16 +412,51 @@ class ContactController extends Controller
         // Prevent circular duplicate A↔B
         if (!empty($payload['duplicate_of_id'])) {
             $target = Contact::select('id', 'duplicate_of_id')
-                ->where('owner_user_id', $r->user()->id)
+                ->where('owner_user_id', $request->user()->id)
                 ->find($payload['duplicate_of_id']);
             if ($target && (int) $target->duplicate_of_id === (int) $contact->id) {
                 return response()->json(['message' => 'Circular duplicate link (A↔B) is not allowed'], 422);
             }
         }
 
-        $contact->fill($payload)->save();
+        // Xử lý address
+        if ($request->hasAny(['address_detail', 'city', 'state', 'country'])) {
+            // Lấy ID từ code
+            $cityId = $request->city ? DB::table('cities')->where('code', $request->city)->value('id') : null;
+            $stateId = $request->state ? DB::table('states')->where('code', $request->state)->value('id') : null;
+            $countryId = $request->country ? DB::table('countries')->where('code', $request->country)->value('id') : null;
 
-        return ['data' => $contact->fresh()->load('tags')];
+            if ($contact->address_id) {
+                // Cập nhật address hiện tại
+                $existingAddress = Address::find($contact->address_id);
+                if ($existingAddress) {
+                    $existingAddress->update([
+                        'address_detail' => $request->input('address_detail', $existingAddress->address_detail),
+                        'city_id' => $cityId ?? $existingAddress->city_id,
+                        'state_id' => $stateId ?? $existingAddress->state_id,
+                        'country_id' => $countryId ?? $existingAddress->country_id,
+                    ]);
+                }
+            } else {
+                // Tạo address mới nếu có ít nhất address_detail hoặc city
+                if ($request->filled('address_detail') || $request->filled('city')) {
+                    $newAddress = Address::create([
+                        'address_detail' => $request->address_detail,
+                        'city_id' => $cityId,
+                        'state_id' => $stateId,
+                        'country_id' => $countryId,
+                    ]);
+                    $payload['address_id'] = $newAddress->id;
+                }
+            }
+        }
+
+        // Loại bỏ các field address khỏi payload
+        unset($payload['address_detail'], $payload['city'], $payload['state'], $payload['country']);
+
+        $contact->update($payload);
+
+        return ['data' => $contact->fresh()->load(['tags', 'address.city', 'address.state', 'address.country'])];
     }
 
     /**
@@ -388,14 +487,23 @@ class ContactController extends Controller
      *     @OA\Parameter(name="contact", in="path", required=true, @OA\Schema(type="integer")),
      *     @OA\RequestBody(
      *         @OA\JsonContent(
-     *             @OA\Property(property="ids", type="array", @OA\Items(type="integer"), description="Tag IDs to attach"),
-     *             @OA\Property(property="names", type="array", @OA\Items(type="string"), description="Tag names to attach (will be created if not exist)")
+     *             @OA\Property(property="ids", type="array", @OA\Items(type="integer")),
+     *             @OA\Property(property="names", type="array", @OA\Items(type="string"))
      *         )
      *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Tags attached successfully",
-     *         @OA\JsonContent(ref="#/components/schemas/Contact")
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="id", type="integer"),
+     *             @OA\Property(property="name", type="string"),
+     *             @OA\Property(property="tags", type="array", @OA\Items(
+     *                 type="object",
+     *                 @OA\Property(property="id", type="integer"),
+     *                 @OA\Property(property="name", type="string")
+     *             ))
+     *         )
      *     )
      * )
      */
@@ -449,9 +557,12 @@ class ContactController extends Controller
      *     @OA\Response(
      *         response=200,
      *         description="Tag detached successfully",
-     *         @OA\JsonContent(ref="#/components/schemas/Contact")
-     *     ),
-     *     @OA\Response(response=403, description="Forbidden")
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="id", type="integer"),
+     *             @OA\Property(property="name", type="string")
+     *         )
+     *     )
      * )
      */
     public function detachTag(Request $r, Contact $contact, Tag $tag)
@@ -553,7 +664,13 @@ class ContactController extends Controller
         }
 
         if (!empty($tagIds) || !empty($tagNames)) {
-            $mode = $r->query('tag_mode', 'any');
+            // THAY ĐỔI: Tự động chuyển sang 'all' nếu có nhiều hashtag từ query string
+            $mode = $r->query('tag_mode');
+            if (!$mode && count($hashTagNames) > 1) {
+                $mode = 'all';
+            }
+            $mode = $mode ?: 'any';
+
             if (!empty($tagIds)) {
                 if ($mode === 'all') {
                     foreach ($tagIds as $id) {
@@ -566,10 +683,16 @@ class ContactController extends Controller
             if (!empty($tagNames)) {
                 if ($mode === 'all') {
                     foreach ($tagNames as $name) {
-                        $query->whereHas('tags', fn($t) => $t->where('tags.name', $name));
+                        $query->whereHas('tags', fn($t) => $t->where('tags.name', 'like', "%{$name}%"));
                     }
                 } else {
-                    $query->whereHas('tags', fn($t) => $t->whereIn('tags.name', $tagNames));
+                    $query->whereHas('tags', function ($t) use ($tagNames) {
+                        $t->where(function ($sub) use ($tagNames) {
+                            foreach ($tagNames as $name) {
+                                $sub->orWhere('tags.name', 'like', "%{$name}%");
+                            }
+                        });
+                    });
                 }
             }
         }
@@ -578,8 +701,12 @@ class ContactController extends Controller
         if ($r->filled('without_tag')) {
             $val = $r->query('without_tag');
             $query->whereDoesntHave('tags', function ($t) use ($val) {
-                if (is_numeric($val)) $t->where('tags.id', (int) $val);
-                else $t->where('tags.name', ltrim((string)$val, '#'));
+                if (is_numeric($val)) {
+                    $t->where('tags.id', (int) $val);
+                } else {
+                    // Thay đổi: search LIKE
+                    $t->where('tags.name', 'like', '%' . ltrim((string)$val, '#') . '%');
+                }
             });
         }
 
@@ -718,5 +845,26 @@ class ContactController extends Controller
         $data = $r->validate(['ids' => ['required', 'array', 'min:1'], 'ids.*' => 'integer']);
         $count = Contact::where('owner_user_id', $uid)->whereIn('id', $data['ids'])->delete();
         return response()->json(['deleted' => $count]);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/contacts/export-template",
+     *     tags={"Contacts"},
+     *     summary="Download import template",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="format", in="query", description="Format", @OA\Schema(type="string", enum={"xlsx", "csv"}, default="xlsx")),
+     *     @OA\Response(response=200, description="Template file download")
+     * )
+     */
+    public function exportTemplate(Request $r)
+    {
+        $export = new ContactsTemplateExport();
+        $format = strtolower((string)$r->query('format', 'xlsx'));
+        $file = 'contacts_template.' . $format;
+
+        return $format === 'csv'
+            ? Excel::download($export, $file, \Maatwebsite\Excel\Excel::CSV)
+            : Excel::download($export, $file, \Maatwebsite\Excel\Excel::XLSX);
     }
 }
