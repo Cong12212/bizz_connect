@@ -564,6 +564,43 @@
                 ]
             }
         },
+        "/api/company/{id}": {
+            "put": {
+                "tags": [
+                    "Company"
+                ],
+                "summary": "Update user's company",
+                "operationId": "dba5691bd7818c368accfd785048ea90",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Company updated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/contacts": {
             "get": {
                 "tags": [
