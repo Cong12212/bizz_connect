@@ -3,6 +3,7 @@ name: Deploy Backend
 on:
   push:
     branches: [main]
+  workflow_dispatch: # Cho phép chạy thủ công
 
 jobs:
   deploy:
@@ -33,12 +34,10 @@ jobs:
           script: |
             cd /home/u564264509/public_html
 
-            # Tạo symlink cho API nếu chưa có
             if [ ! -L "api" ]; then
               ln -s backend/public api
             fi
 
-            # Tạo .env file
             cd backend
             cat > .env << 'EOF'
             APP_NAME=BizConnect
@@ -59,7 +58,6 @@ jobs:
             LOG_DEPRECATIONS_CHANNEL=null
             LOG_LEVEL=error
 
-            # Database
             DB_CONNECTION=mysql
             DB_HOST=localhost
             DB_PORT=3306
@@ -67,7 +65,6 @@ jobs:
             DB_USERNAME=${{ secrets.DB_USERNAME }}
             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
 
-            # Session / Cache / Queue
             SESSION_DRIVER=file
             SESSION_LIFETIME=120
             SESSION_ENCRYPT=false
@@ -78,13 +75,11 @@ jobs:
             QUEUE_CONNECTION=database
             CACHE_STORE=file
 
-            # Redis
             REDIS_CLIENT=phpredis
             REDIS_HOST=127.0.0.1
             REDIS_PASSWORD=null
             REDIS_PORT=6379
 
-            # Mail
             MAIL_MAILER=smtp
             MAIL_HOST=smtp.gmail.com
             MAIL_PORT=587
@@ -94,29 +89,14 @@ jobs:
             MAIL_FROM_ADDRESS=${{ secrets.MAIL_USERNAME }}
             MAIL_FROM_NAME="BizConnect"
 
-            # Swagger
             L5_SWAGGER_CONST_HOST=https://biz-connect.online/api
             L5_SWAGGER_GENERATE_ALWAYS=false
             L5_SWAGGER_USE_ABSOLUTE_PATH=false
             EOF
 
-            # Set permissions
             chmod 644 .env
-
-            # Install dependencies (nếu có composer)
-            if [ -f "composer.json" ]; then
-              composer install --no-dev --optimize-autoloader --no-interaction
-            fi
-
-            # Clear and cache config
             php artisan config:clear
             php artisan cache:clear
             php artisan route:clear
-            php artisan view:clear
-
             php artisan config:cache
             php artisan route:cache
-            php artisan view:cache
-
-            # Run migrations (UNCOMMENT nếu muốn auto migrate)
-            # php artisan migrate --force
