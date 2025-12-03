@@ -1,0 +1,122 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy Backend to Server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "."
+          target: "/home/u564264509/public_html/backend/"
+          rm: false
+
+      - name: Setup Backend Environment
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /home/u564264509/public_html
+
+            # Tạo symlink cho API nếu chưa có
+            if [ ! -L "api" ]; then
+              ln -s backend/public api
+            fi
+
+            # Tạo .env file
+            cd backend
+            cat > .env << 'EOF'
+            APP_NAME=BizConnect
+            APP_ENV=production
+            APP_KEY=${{ secrets.APP_KEY }}
+            APP_DEBUG=false
+            APP_URL=https://biz-connect.online
+            FRONTEND_URL=https://biz-connect.online
+            APP_LOCALE=en
+            APP_FALLBACK_LOCALE=en
+            APP_FAKER_LOCALE=en_US
+            APP_MAINTENANCE_DRIVER=file
+            PHP_CLI_SERVER_WORKERS=4
+            BCRYPT_ROUNDS=12
+
+            LOG_CHANNEL=stack
+            LOG_STACK=single
+            LOG_DEPRECATIONS_CHANNEL=null
+            LOG_LEVEL=error
+
+            # Database
+            DB_CONNECTION=mysql
+            DB_HOST=localhost
+            DB_PORT=3306
+            DB_DATABASE=${{ secrets.DB_DATABASE }}
+            DB_USERNAME=${{ secrets.DB_USERNAME }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+
+            # Session / Cache / Queue
+            SESSION_DRIVER=file
+            SESSION_LIFETIME=120
+            SESSION_ENCRYPT=false
+            SESSION_PATH=/
+            SESSION_DOMAIN=null
+            BROADCAST_CONNECTION=log
+            FILESYSTEM_DISK=local
+            QUEUE_CONNECTION=database
+            CACHE_STORE=file
+
+            # Redis
+            REDIS_CLIENT=phpredis
+            REDIS_HOST=127.0.0.1
+            REDIS_PASSWORD=null
+            REDIS_PORT=6379
+
+            # Mail
+            MAIL_MAILER=smtp
+            MAIL_HOST=smtp.gmail.com
+            MAIL_PORT=587
+            MAIL_ENCRYPTION=tls
+            MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
+            MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
+            MAIL_FROM_ADDRESS=${{ secrets.MAIL_USERNAME }}
+            MAIL_FROM_NAME="BizConnect"
+
+            # Swagger
+            L5_SWAGGER_CONST_HOST=https://biz-connect.online/api
+            L5_SWAGGER_GENERATE_ALWAYS=false
+            L5_SWAGGER_USE_ABSOLUTE_PATH=false
+            EOF
+
+            # Set permissions
+            chmod 644 .env
+
+            # Install dependencies (nếu có composer)
+            if [ -f "composer.json" ]; then
+              composer install --no-dev --optimize-autoloader --no-interaction
+            fi
+
+            # Clear and cache config
+            php artisan config:clear
+            php artisan cache:clear
+            php artisan route:clear
+            php artisan view:clear
+
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
+
+            # Run migrations (UNCOMMENT nếu muốn auto migrate)
+            # php artisan migrate --force
