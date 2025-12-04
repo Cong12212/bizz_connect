@@ -13,18 +13,34 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
     
-    - name: Deploy Backend to Server
-      uses: appleboy/scp-action@master
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        port: ${{ secrets.SSH_PORT }}
-        username: ${{ secrets.SSH_USERNAME }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        source: "."
-        target: "/home/u564264509/public_html/backend/"
-        rm: false
+    - name: List files before deploy
+      run: |
+        echo "===== Repository contents ====="
+        ls -la
+        echo "===== App folder ====="
+        ls -la app/ || echo "No app folder"
+        echo "===== Public folder ====="
+        ls -la public/ || echo "No public folder"
     
-    - name: Setup Backend Environment
+    - name: Setup SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+    
+    - name: Deploy files via rsync
+      run: |
+        rsync -avz --progress \
+          -e "ssh -p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
+          --exclude='.git' \
+          --exclude='vendor/' \
+          --exclude='node_modules/' \
+          --exclude='.env' \
+          --exclude='storage/*.key' \
+          ./ ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:/home/u564264509/public_html/backend/
+    
+    - name: Setup Backend on Server
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.SSH_HOST }}
@@ -32,15 +48,12 @@ jobs:
         username: ${{ secrets.SSH_USERNAME }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
-          cd /home/u564264509/public_html
+          cd /home/u564264509/public_html/backend
           
-          # Tạo symlink cho API nếu chưa có
-          if [ ! -L "api" ]; then
-            ln -s backend/public api
-          fi
+          echo "===== Files uploaded ====="
+          ls -la
           
-          # Tạo .env file
-          cd backend
+          echo "===== Creating .env ====="
           cat > .env << 'EOF'
           APP_NAME=BizConnect
           APP_ENV=production
@@ -50,14 +63,8 @@ jobs:
           FRONTEND_URL=https://biz-connect.online
           APP_LOCALE=en
           APP_FALLBACK_LOCALE=en
-          APP_FAKER_LOCALE=en_US
-          APP_MAINTENANCE_DRIVER=file
-          PHP_CLI_SERVER_WORKERS=4
-          BCRYPT_ROUNDS=12
           
           LOG_CHANNEL=stack
-          LOG_STACK=single
-          LOG_DEPRECATIONS_CHANNEL=null
           LOG_LEVEL=error
           
           DB_CONNECTION=mysql
@@ -69,18 +76,8 @@ jobs:
           
           SESSION_DRIVER=file
           SESSION_LIFETIME=120
-          SESSION_ENCRYPT=false
-          SESSION_PATH=/
-          SESSION_DOMAIN=null
-          BROADCAST_CONNECTION=log
-          FILESYSTEM_DISK=local
-          QUEUE_CONNECTION=database
           CACHE_STORE=file
-          
-          REDIS_CLIENT=phpredis
-          REDIS_HOST=127.0.0.1
-          REDIS_PASSWORD=null
-          REDIS_PORT=6379
+          QUEUE_CONNECTION=database
           
           MAIL_MAILER=smtp
           MAIL_HOST=smtp.gmail.com
@@ -90,27 +87,31 @@ jobs:
           MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
           MAIL_FROM_ADDRESS=${{ secrets.MAIL_USERNAME }}
           MAIL_FROM_NAME="BizConnect"
-          
-          L5_SWAGGER_CONST_HOST=https://biz-connect.online/api
-          L5_SWAGGER_GENERATE_ALWAYS=false
-          L5_SWAGGER_USE_ABSOLUTE_PATH=false
           EOF
           
           chmod 644 .env
           
-          # Install dependencies nếu có composer
-          if [ -f "composer.json" ]; then
-            composer install --no-dev --optimize-autoloader --no-interaction || echo "Composer install failed or not needed"
+          echo "===== Installing Composer dependencies ====="
+          composer install --no-dev --optimize-autoloader --no-interaction || echo "Composer install failed"
+          
+          echo "===== Setting permissions ====="
+          chmod -R 755 storage bootstrap/cache
+          
+          echo "===== Clearing cache ====="
+          php artisan config:clear
+          php artisan cache:clear
+          php artisan route:clear
+          php artisan view:clear
+          
+          echo "===== Caching config ====="
+          php artisan config:cache
+          php artisan route:cache
+          php artisan view:cache
+          
+          echo "===== Creating symlink for API ====="
+          cd /home/u564264509/public_html
+          if [ ! -L "api" ]; then
+            ln -s backend/public api
           fi
           
-          # Clear and cache config
-          php artisan config:clear || echo "Config clear failed"
-          php artisan cache:clear || echo "Cache clear failed"
-          php artisan route:clear || echo "Route clear failed"
-          php artisan view:clear || echo "View clear failed"
-          
-          php artisan config:cache || echo "Config cache failed"
-          php artisan route:cache || echo "Route cache failed"
-          php artisan view:cache || echo "View cache failed"
-          
-          echo "===== Deployment completed! ====="
+          echo "===== Deployment completed successfully! ====="
