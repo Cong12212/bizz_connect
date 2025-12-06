@@ -13,15 +13,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
     
-    - name: List files before deploy
-      run: |
-        echo "===== Repository contents ====="
-        ls -la
-        echo "===== App folder ====="
-        ls -la app/ || echo "No app folder"
-        echo "===== Public folder ====="
-        ls -la public/ || echo "No public folder"
-    
     - name: Setup SSH key
       run: |
         mkdir -p ~/.ssh
@@ -38,7 +29,7 @@ jobs:
           --exclude='node_modules/' \
           --exclude='.env' \
           --exclude='storage/*.key' \
-          ./ ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:/home/u564264509/public_html/backend/
+          ./ ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:/home/u564264509/domains/biz-connect.online/public_html/backend/
     
     - name: Setup Backend on Server
       uses: appleboy/ssh-action@master
@@ -48,10 +39,7 @@ jobs:
         username: ${{ secrets.SSH_USERNAME }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
-          cd /home/u564264509/public_html/backend
-          
-          echo "===== Files uploaded ====="
-          ls -la
+          cd /home/u564264509/domains/biz-connect.online/public_html/backend
           
           echo "===== Creating .env ====="
           cat > .env << 'EOF'
@@ -61,8 +49,6 @@ jobs:
           APP_DEBUG=false
           APP_URL=https://biz-connect.online
           FRONTEND_URL=https://biz-connect.online
-          APP_LOCALE=en
-          APP_FALLBACK_LOCALE=en
           
           LOG_CHANNEL=stack
           LOG_LEVEL=error
@@ -75,7 +61,6 @@ jobs:
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
           
           SESSION_DRIVER=file
-          SESSION_LIFETIME=120
           CACHE_STORE=file
           QUEUE_CONNECTION=database
           
@@ -101,15 +86,16 @@ jobs:
           php artisan config:clear
           php artisan cache:clear
           php artisan route:clear
-          php artisan view:clear
           
           echo "===== Caching config ====="
           php artisan config:cache
           php artisan route:cache
-          php artisan view:cache
+          
+          echo "===== Running migrations ====="
+          php artisan migrate --force || echo "Migration failed"
           
           echo "===== Creating symlink for API ====="
-          cd /home/u564264509/public_html
+          cd /home/u564264509/domains/biz-connect.online/public_html
           if [ ! -L "api" ]; then
             ln -s backend/public api
           fi
