@@ -31,17 +31,22 @@ jobs:
           --exclude='storage/*.key' \
           ./ ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:/home/u564264509/domains/biz-connect.online/public_html/backend/
     
-    - name: Setup Backend on Server
+    - name: Setup Backend Environment
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.SSH_HOST }}
         port: ${{ secrets.SSH_PORT }}
         username: ${{ secrets.SSH_USERNAME }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
+        command_timeout: 30m
         script: |
+          echo "===== Starting deployment ====="
           cd /home/u564264509/domains/biz-connect.online/public_html/backend
           
-          echo "===== Creating .env ====="
+          echo "===== PHP Version ====="
+          php -v
+          
+          echo "===== Creating .env file ====="
           cat > .env << 'EOF'
           APP_NAME=BizConnect
           APP_ENV=production
@@ -49,6 +54,8 @@ jobs:
           APP_DEBUG=false
           APP_URL=https://biz-connect.online
           FRONTEND_URL=https://biz-connect.online
+          APP_LOCALE=en
+          APP_FALLBACK_LOCALE=en
           
           LOG_CHANNEL=stack
           LOG_LEVEL=error
@@ -61,6 +68,7 @@ jobs:
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
           
           SESSION_DRIVER=file
+          SESSION_LIFETIME=120
           CACHE_STORE=file
           QUEUE_CONNECTION=database
           
@@ -72,32 +80,53 @@ jobs:
           MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
           MAIL_FROM_ADDRESS=${{ secrets.MAIL_USERNAME }}
           MAIL_FROM_NAME="BizConnect"
+          
+          L5_SWAGGER_CONST_HOST=https://biz-connect.online/api
+          L5_SWAGGER_GENERATE_ALWAYS=false
           EOF
           
           chmod 644 .env
           
           echo "===== Installing Composer dependencies ====="
-          composer install --no-dev --optimize-autoloader --no-interaction || echo "Composer install failed"
+          if command -v composer &> /dev/null; then
+            composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
+          else
+            php /usr/local/bin/composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
+          fi
           
           echo "===== Setting permissions ====="
-          chmod -R 755 storage bootstrap/cache
+          chmod -R 775 storage bootstrap/cache
+          chmod -R 664 storage/logs
           
-          echo "===== Clearing cache ====="
+          echo "===== Clearing all caches ====="
           php artisan config:clear
           php artisan cache:clear
           php artisan route:clear
+          php artisan view:clear
+          
+          echo "===== Testing database connection ====="
+          php artisan db:show || echo "Database connection failed - check credentials"
+          
+          echo "===== Running migrations ====="
+          php artisan migrate --force
           
           echo "===== Caching config ====="
           php artisan config:cache
           php artisan route:cache
+          php artisan view:cache
           
-          echo "===== Running migrations ====="
-          php artisan migrate --force || echo "Migration failed"
-          
-          echo "===== Creating symlink for API ====="
+          echo "===== Creating API symlink ====="
           cd /home/u564264509/domains/biz-connect.online/public_html
           if [ ! -L "api" ]; then
             ln -s backend/public api
+            echo "Symlink created"
+          else
+            echo "Symlink already exists"
           fi
+          
+          echo "===== Final verification ====="
+          cd /home/u564264509/domains/biz-connect.online/public_html/backend
+          php artisan --version
+          php artisan route:list | head -10
           
           echo "===== Deployment completed successfully! ====="
