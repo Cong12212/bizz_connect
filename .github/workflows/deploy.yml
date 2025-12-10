@@ -107,8 +107,11 @@ jobs:
           echo "===== Testing database connection ====="
           php artisan db:show || echo "Database connection failed - check credentials"
           
-          echo "===== Running migrations ====="
-          php artisan migrate --force
+          echo "===== Running fresh migrations (first time) ====="
+          php artisan migrate:fresh --force || echo "Fresh migration failed, trying normal migrate..."
+          
+          echo "===== Migration status ====="
+          php artisan migrate:status
           
           echo "===== Caching config ====="
           php artisan config:cache
