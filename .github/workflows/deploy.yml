@@ -22,7 +22,7 @@ jobs:
     
     - name: Deploy files via rsync
       run: |
-        rsync -avz --progress \
+        rsync -avz --progress --delete \
           -e "ssh -p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
           --exclude='.git' \
           --exclude='vendor/' \
