@@ -7,16 +7,6 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
   public function up(): void
   {
-    Schema::create('tags', function (Blueprint $t) {
-      $t->id();
-      $t->foreignId('owner_user_id')->constrained('users')->cascadeOnDelete();
-      $t->string('name');
-      $t->timestamps();
-
-      // unique by user
-      $t->unique(['owner_user_id', 'name']);
-    });
-
     Schema::create('contact_tag', function (Blueprint $t) {
       $t->id();
       $t->foreignId('contact_id')->constrained('contacts')->cascadeOnDelete();
@@ -27,9 +17,9 @@ return new class extends Migration {
       $t->index(['tag_id', 'contact_id']);
     });
   }
+
   public function down(): void
   {
     Schema::dropIfExists('contact_tag');
-    Schema::dropIfExists('tags');
   }
 };

@@ -2,12 +2,12 @@
 
 namespace App\Http\Middleware;
 
-use Illuminate\Cookie\Middleware\EncryptCookies as Middleware;
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as Middleware;
 
-class EncryptCookies extends Middleware
+class VerifyCsrfToken extends Middleware
 {
     /**
-     * The names of the cookies that should not be encrypted.
+     * The URIs that should be excluded from CSRF verification.
      *
      * @var array<int, string>
      */
