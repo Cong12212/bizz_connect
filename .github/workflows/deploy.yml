@@ -52,8 +52,8 @@ jobs:
           APP_ENV=production
           APP_KEY=${{ secrets.APP_KEY }}
           APP_DEBUG=false
-          APP_URL=https://biz-connect.online
-          FRONTEND_URL=https://biz-connect.online
+          APP_URL=http://biz-connect.online
+          FRONTEND_URL=http://biz-connect.online
           APP_LOCALE=en
           APP_FALLBACK_LOCALE=en
           
@@ -82,7 +82,7 @@ jobs:
           MAIL_FROM_NAME="BizConnect"
           
           L5_SWAGGER_CONST_HOST=https://biz-connect.online/api
-          L5_SWAGGER_GENERATE_ALWAYS=false
+          L5_SWAGGER_GENERATE_ALWAYS=true
           EOF
           
           chmod 644 .env
