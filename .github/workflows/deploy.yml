@@ -52,7 +52,7 @@ jobs:
           APP_ENV=production
           APP_KEY=${{ secrets.APP_KEY }}
           APP_DEBUG=false
-          APP_URL=http://biz-connect.online
+          APP_URL=http://biz-connect.online/backend/public
           FRONTEND_URL=http://biz-connect.online
           APP_LOCALE=en
           APP_FALLBACK_LOCALE=en
@@ -81,7 +81,7 @@ jobs:
           MAIL_FROM_ADDRESS=${{ secrets.MAIL_USERNAME }}
           MAIL_FROM_NAME="BizConnect"
           
-          L5_SWAGGER_CONST_HOST=https://biz-connect.online/api
+          L5_SWAGGER_CONST_HOST=http://biz-connect.online/backend/public
           L5_SWAGGER_GENERATE_ALWAYS=true
           EOF
           
@@ -107,29 +107,57 @@ jobs:
           echo "===== Testing database connection ====="
           php artisan db:show || echo "Database connection failed - check credentials"
           
-          echo "===== Running fresh migrations (first time) ====="
-          php artisan migrate:fresh --force || echo "Fresh migration failed, trying normal migrate..."
+          echo "===== Running migrations ====="
+          php artisan migrate --force || echo "Migration failed"
           
           echo "===== Migration status ====="
           php artisan migrate:status
+          
+          echo "===== Generating Swagger documentation ====="
+          php artisan l5-swagger:generate
           
           echo "===== Caching config ====="
           php artisan config:cache
           php artisan route:cache
           php artisan view:cache
           
-          echo "===== Creating API symlink ====="
+          echo "===== Setting up root access ====="
           cd /home/u564264509/domains/biz-connect.online/public_html
-          if [ ! -L "api" ]; then
-            ln -s backend/public api
-            echo "Symlink created"
-          else
-            echo "Symlink already exists"
-          fi
+          
+          # Xóa index cũ nếu có
+          rm -f index.php index.html
+          
+          # Tạo index.php redirect
+          cat > index.php << 'INDEXEOF'
+          <?php
+          // Redirect to Laravel backend
+          header('Location: /backend/public/');
+          exit;
+          INDEXEOF
+          
+          # Tạo .htaccess cho root
+          cat > .htaccess << 'HTACCESSEOF'
+          <IfModule mod_rewrite.c>
+              RewriteEngine On
+              
+              # Redirect all API requests to backend/public
+              RewriteRule ^api/(.*)$ backend/public/api/$1 [L,QSA]
+              
+              # Redirect root to backend/public
+              RewriteCond %{REQUEST_URI} !^/backend/public/
+              RewriteCond %{REQUEST_FILENAME} !-f
+              RewriteCond %{REQUEST_FILENAME} !-d
+              RewriteRule ^(.*)$ backend/public/$1 [L,QSA]
+          </IfModule>
+          HTACCESSEOF
           
           echo "===== Final verification ====="
           cd /home/u564264509/domains/biz-connect.online/public_html/backend
           php artisan --version
-          php artisan route:list | head -10
+          php artisan route:list | head -20
           
           echo "===== Deployment completed successfully! ====="
+          echo "===== Access your app at: ====="
+          echo "Frontend: http://biz-connect.online"
+          echo "API: http://biz-connect.online/api"
+          echo "Swagger: http://biz-connect.online/api/documentation"
