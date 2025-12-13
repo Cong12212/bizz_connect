@@ -2,101 +2,162 @@ name: Deploy Backend
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch: # Cho phép chạy thủ công
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Deploy Backend to Server
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          port: ${{ secrets.SSH_PORT }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "."
-          target: "/home/u564264509/public_html/backend/"
-          rm: false
-
-      - name: Setup Backend Environment
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          port: ${{ secrets.SSH_PORT }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            cd /home/u564264509/public_html
-
-            if [ ! -L "api" ]; then
-              ln -s backend/public api
-            fi
-
-            cd backend
-            cat > .env << 'EOF'
-            APP_NAME=BizConnect
-            APP_ENV=production
-            APP_KEY=${{ secrets.APP_KEY }}
-            APP_DEBUG=false
-            APP_URL=https://biz-connect.online
-            FRONTEND_URL=https://biz-connect.online
-            APP_LOCALE=en
-            APP_FALLBACK_LOCALE=en
-            APP_FAKER_LOCALE=en_US
-            APP_MAINTENANCE_DRIVER=file
-            PHP_CLI_SERVER_WORKERS=4
-            BCRYPT_ROUNDS=12
-
-            LOG_CHANNEL=stack
-            LOG_STACK=single
-            LOG_DEPRECATIONS_CHANNEL=null
-            LOG_LEVEL=error
-
-            DB_CONNECTION=mysql
-            DB_HOST=localhost
-            DB_PORT=3306
-            DB_DATABASE=${{ secrets.DB_DATABASE }}
-            DB_USERNAME=${{ secrets.DB_USERNAME }}
-            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-
-            SESSION_DRIVER=file
-            SESSION_LIFETIME=120
-            SESSION_ENCRYPT=false
-            SESSION_PATH=/
-            SESSION_DOMAIN=null
-            BROADCAST_CONNECTION=log
-            FILESYSTEM_DISK=local
-            QUEUE_CONNECTION=database
-            CACHE_STORE=file
-
-            REDIS_CLIENT=phpredis
-            REDIS_HOST=127.0.0.1
-            REDIS_PASSWORD=null
-            REDIS_PORT=6379
-
-            MAIL_MAILER=smtp
-            MAIL_HOST=smtp.gmail.com
-            MAIL_PORT=587
-            MAIL_ENCRYPTION=tls
-            MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
-            MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
-            MAIL_FROM_ADDRESS=${{ secrets.MAIL_USERNAME }}
-            MAIL_FROM_NAME="BizConnect"
-
-            L5_SWAGGER_CONST_HOST=https://biz-connect.online/api
-            L5_SWAGGER_GENERATE_ALWAYS=false
-            L5_SWAGGER_USE_ABSOLUTE_PATH=false
-            EOF
-
-            chmod 644 .env
-            php artisan config:clear
-            php artisan cache:clear
-            php artisan route:clear
-            php artisan config:cache
-            php artisan route:cache
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+    
+    - name: Deploy files via rsync
+      run: |
+        rsync -avz --progress --delete \
+          -e "ssh -p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
+          --exclude='.git' \
+          --exclude='vendor/' \
+          --exclude='node_modules/' \
+          --exclude='.env' \
+          --exclude='storage/*.key' \
+          ./ ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:/home/u564264509/domains/biz-connect.online/public_html/backend/
+    
+    - name: Setup Backend Environment
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        port: ${{ secrets.SSH_PORT }}
+        username: ${{ secrets.SSH_USERNAME }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        command_timeout: 30m
+        script: |
+          echo "===== Starting deployment ====="
+          cd /home/u564264509/domains/biz-connect.online/public_html/backend
+          
+          echo "===== PHP Version ====="
+          php -v
+          
+          echo "===== Creating .env file ====="
+          cat > .env << 'EOF'
+          APP_NAME=BizConnect
+          APP_ENV=production
+          APP_KEY=${{ secrets.APP_KEY }}
+          APP_DEBUG=false
+          APP_URL=http://biz-connect.online/backend/public
+          FRONTEND_URL=http://biz-connect.online
+          APP_LOCALE=en
+          APP_FALLBACK_LOCALE=en
+          
+          LOG_CHANNEL=stack
+          LOG_LEVEL=error
+          
+          DB_CONNECTION=mysql
+          DB_HOST=localhost
+          DB_PORT=3306
+          DB_DATABASE=${{ secrets.DB_DATABASE }}
+          DB_USERNAME=${{ secrets.DB_USERNAME }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          
+          SESSION_DRIVER=file
+          SESSION_LIFETIME=120
+          CACHE_STORE=file
+          QUEUE_CONNECTION=database
+          
+          MAIL_MAILER=smtp
+          MAIL_HOST=smtp.gmail.com
+          MAIL_PORT=587
+          MAIL_ENCRYPTION=tls
+          MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
+          MAIL_FROM_ADDRESS=${{ secrets.MAIL_USERNAME }}
+          MAIL_FROM_NAME="BizConnect"
+          
+          L5_SWAGGER_CONST_HOST=http://biz-connect.online/backend/public
+          L5_SWAGGER_GENERATE_ALWAYS=true
+          EOF
+          
+          chmod 644 .env
+          
+          echo "===== Installing Composer dependencies ====="
+          if command -v composer &> /dev/null; then
+            composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
+          else
+            php /usr/local/bin/composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
+          fi
+          
+          echo "===== Setting permissions ====="
+          chmod -R 775 storage bootstrap/cache
+          chmod -R 664 storage/logs
+          
+          echo "===== Clearing all caches ====="
+          php artisan config:clear
+          php artisan cache:clear
+          php artisan route:clear
+          php artisan view:clear
+          
+          echo "===== Testing database connection ====="
+          php artisan db:show || echo "Database connection failed - check credentials"
+          
+          echo "===== Running migrations ====="
+          php artisan migrate --force || echo "Migration failed"
+          
+          echo "===== Migration status ====="
+          php artisan migrate:status
+          
+          echo "===== Generating Swagger documentation ====="
+          php artisan l5-swagger:generate
+          
+          echo "===== Caching config ====="
+          php artisan config:cache
+          php artisan route:cache
+          php artisan view:cache
+          
+          echo "===== Setting up root access ====="
+          cd /home/u564264509/domains/biz-connect.online/public_html
+          
+          # Xóa index cũ nếu có
+          rm -f index.php index.html
+          
+          # Tạo index.php redirect
+          cat > index.php << 'INDEXEOF'
+          <?php
+          // Redirect to Laravel backend
+          header('Location: /backend/public/');
+          exit;
+          INDEXEOF
+          
+          # Tạo .htaccess cho root
+          cat > .htaccess << 'HTACCESSEOF'
+          <IfModule mod_rewrite.c>
+              RewriteEngine On
+              
+              # Redirect all API requests to backend/public
+              RewriteRule ^api/(.*)$ backend/public/api/$1 [L,QSA]
+              
+              # Redirect root to backend/public
+              RewriteCond %{REQUEST_URI} !^/backend/public/
+              RewriteCond %{REQUEST_FILENAME} !-f
+              RewriteCond %{REQUEST_FILENAME} !-d
+              RewriteRule ^(.*)$ backend/public/$1 [L,QSA]
+          </IfModule>
+          HTACCESSEOF
+          
+          echo "===== Final verification ====="
+          cd /home/u564264509/domains/biz-connect.online/public_html/backend
+          php artisan --version
+          php artisan route:list | head -20
+          
+          echo "===== Deployment completed successfully! ====="
+          echo "===== Access your app at: ====="
+          echo "Frontend: http://biz-connect.online"
+          echo "API: http://biz-connect.online/api"
+          echo "Swagger: http://biz-connect.online/api/documentation"

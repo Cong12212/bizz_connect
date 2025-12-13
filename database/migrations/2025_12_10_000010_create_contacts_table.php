@@ -8,25 +8,25 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('contacts', function (Blueprint $t)
-        {
+        Schema::create('contacts', function (Blueprint $t) {
             $t->id();
 
             // Owner (link to user)
             $t->foreignId('owner_user_id')
-              ->constrained('users')
-              ->cascadeOnDelete();
+                ->constrained('users')
+                ->cascadeOnDelete();
 
             // Main information
             $t->string('name');
             $t->string('job_title')->nullable();
-            $t->string('company')->nullable();      // <-- only once
+            $t->string('company')->nullable();
 
             $t->string('email')->nullable();
             $t->string('phone')->nullable();
 
-            // Match with FE
+            // Address - giữ text đơn giản
             $t->string('address')->nullable();
+
             $t->text('notes')->nullable();
 
             // Meta (optional)

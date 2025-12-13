@@ -10,10 +10,10 @@ return new class extends Migration {
     Schema::create('audit_logs', function (Blueprint $t) {
       $t->id();
       $t->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
-      $t->string('action'); // created_contact, updated_contact, delete, export, import, etc.
+      $t->string('action');
       $t->string('model_type')->nullable();
       $t->unsignedBigInteger('model_id')->nullable();
-      $t->json('changes')->nullable(); // before/after
+      $t->json('changes')->nullable();
       $t->string('ip')->nullable();
       $t->text('ua')->nullable();
       $t->timestamps();
@@ -22,6 +22,7 @@ return new class extends Migration {
       $t->index(['model_type', 'model_id']);
     });
   }
+
   public function down(): void
   {
     Schema::dropIfExists('audit_logs');
