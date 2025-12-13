@@ -1,0 +1,843 @@
+========== FILE: 0001_01_01_000000_create_users_table.php ==========
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+  public function up(): void
+  {
+    Schema::create('users', function (Blueprint $t) {
+      $t->id();
+      $t->string('name');
+      $t->string('email')->unique();
+      $t->timestamp('email_verified_at')->nullable();
+      $t->string('password');
+      $t->string('phone')->nullable();
+      $t->string('avatar_url')->nullable();
+      $t->string('locale')->nullable();
+      $t->string('timezone')->nullable();
+      $t->unsignedBigInteger('company_id')->nullable();
+      $t->unsignedBigInteger('business_card_id')->nullable();
+      $t->rememberToken();
+      $t->timestamps();
+      $t->softDeletes();
+      $t->index('email');
+    });
+  }
+
+  public function down(): void
+  {
+    Schema::dropIfExists('users');
+  }
+};
+
+
+
+========== FILE: 2024_01_15_add_address_id_to_contacts_table.php ==========
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('contacts', function (Blueprint $table) {
+            // Thêm cột address_id (nullable để không ảnh hưởng data cũ)
+            $table->unsignedBigInteger('address_id')->nullable()->after('phone');
+
+            // Thêm foreign key constraint
+            $table->foreign('address_id')
+                ->references('id')
+                ->on('addresses')
+                ->onDelete('set null'); // Khi xóa address thì set null, không xóa contact
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('contacts', function (Blueprint $table) {
+            // Xóa foreign key trước
+            $table->dropForeign(['address_id']);
+
+            // Xóa cột
+            $table->dropColumn('address_id');
+        });
+    }
+};
+
+
+
+========== FILE: 2024_01_15_migrate_contact_addresses_data.php ==========
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        // Migrate data từ cột 'address' sang bảng addresses
+        $contacts = DB::table('contacts')
+            ->whereNotNull('address')
+            ->where('address', '!=', '')
+            ->get();
+
+        foreach ($contacts as $contact) {
+            // Tạo address mới từ text address cũ
+            $addressId = DB::table('addresses')->insertGetId([
+                'line1' => $contact->address, // Lưu toàn bộ text vào line1
+                'line2' => null,
+                'city' => null,
+                'state' => null,
+                'country' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // Update contact với address_id mới
+            DB::table('contacts')
+                ->where('id', $contact->id)
+                ->update(['address_id' => $addressId]);
+        }
+    }
+
+    public function down(): void
+    {
+        // Rollback: copy address line1 trở lại cột address
+        $contacts = DB::table('contacts')
+            ->whereNotNull('address_id')
+            ->get();
+
+        foreach ($contacts as $contact) {
+            $address = DB::table('addresses')->find($contact->address_id);
+            if ($address) {
+                DB::table('contacts')
+                    ->where('id', $contact->id)
+                    ->update(['address' => $address->line1]);
+            }
+        }
+    }
+};
+
+
+
+========== FILE: 2024_01_16_remove_address_column_from_contacts.php ==========
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('contacts', function (Blueprint $table) {
+            // Xóa cột address cũ
+            $table->dropColumn('address');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('contacts', function (Blueprint $table) {
+            // Thêm lại cột address nếu rollback
+            $table->text('address')->nullable();
+        });
+    }
+};
+
+
+
+========== FILE: 2025_08_26_154810_create_contacts_table.php ==========
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('contacts', function (Blueprint $t)
+        {
+            $t->id();
+
+            // Owner (link to user)
+            $t->foreignId('owner_user_id')
+              ->constrained('users')
+              ->cascadeOnDelete();
+
+            // Main information
+            $t->string('name');
+            $t->string('job_title')->nullable();
+            $t->string('company')->nullable();      // <-- only once
+
+            $t->string('email')->nullable();
+            $t->string('phone')->nullable();
+
+            // Match with FE
+            $t->string('address')->nullable();
+            $t->text('notes')->nullable();
+
+            // Meta (optional)
+            $t->string('linkedin_url')->nullable();
+            $t->string('website_url')->nullable();
+            $t->text('ocr_raw')->nullable();
+            $t->unsignedBigInteger('duplicate_of_id')->nullable();
+            $t->text('search_text')->nullable();
+            $t->string('source')->default('manual');
+
+            $t->timestamps();
+            $t->softDeletes();
+
+            // Indexes
+            $t->index('owner_user_id');
+            $t->index('email');
+            $t->index('phone');
+            $t->fullText(['name', 'company', 'email', 'phone']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('contacts');
+    }
+};
+
+
+
+========== FILE: 2025_08_26_154908_create_tags_and_pivot_tables.php ==========
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+  public function up(): void
+  {
+    Schema::create('tags', function (Blueprint $t) {
+      $t->id();
+      $t->foreignId('owner_user_id')->constrained('users')->cascadeOnDelete();
+      $t->string('name');
+      $t->timestamps();
+
+      // unique by user
+      $t->unique(['owner_user_id', 'name']);
+    });
+
+    Schema::create('contact_tag', function (Blueprint $t) {
+      $t->id();
+      $t->foreignId('contact_id')->constrained('contacts')->cascadeOnDelete();
+      $t->foreignId('tag_id')->constrained('tags')->cascadeOnDelete();
+      $t->timestamps();
+
+      $t->unique(['contact_id', 'tag_id']);
+      $t->index(['tag_id', 'contact_id']);
+    });
+  }
+  public function down(): void
+  {
+    Schema::dropIfExists('contact_tag');
+    Schema::dropIfExists('tags');
+  }
+};
+
+
+
+========== FILE: 2025_08_26_154945_create_reminders_table.php ==========
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+  public function up(): void {
+    Schema::create('reminders', function (Blueprint $t) {
+      $t->id();
+      $t->foreignId('contact_id')->constrained('contacts')->cascadeOnDelete();
+      $t->foreignId('owner_user_id')->constrained('users')->cascadeOnDelete(); 
+      $t->string('title');
+      $t->text('note')->nullable();
+      $t->dateTime('due_at')->index();
+      $t->string('status')->default('pending')->index();  
+      $t->string('channel')->default('app');             
+      $t->string('external_event_id')->nullable();      
+      $t->timestamps();
+      $t->softDeletes();
+    });
+  }
+  public function down(): void { Schema::dropIfExists('reminders'); }
+};
+
+
+
+========== FILE: 2025_09_22_000110_create_audit_logs_table.php ==========
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+  public function up(): void
+  {
+    Schema::create('audit_logs', function (Blueprint $t) {
+      $t->id();
+      $t->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
+      $t->string('action'); // created_contact, updated_contact, delete, export, import, etc.
+      $t->string('model_type')->nullable();
+      $t->unsignedBigInteger('model_id')->nullable();
+      $t->json('changes')->nullable(); // before/after
+      $t->string('ip')->nullable();
+      $t->text('ua')->nullable();
+      $t->timestamps();
+
+      $t->index(['user_id', 'created_at']);
+      $t->index(['model_type', 'model_id']);
+    });
+  }
+  public function down(): void
+  {
+    Schema::dropIfExists('audit_logs');
+  }
+};
+
+
+
+========== FILE: 2025_09_22_111247_create_personal_access_tokens_table.php ==========
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('personal_access_tokens', function (Blueprint $table) {
+            $table->id();
+            $table->morphs('tokenable');
+            $table->text('name');
+            $table->string('token', 64)->unique();
+            $table->text('abilities')->nullable();
+            $table->timestamp('last_used_at')->nullable();
+            $table->timestamp('expires_at')->nullable()->index();
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('personal_access_tokens');
+    }
+};
+
+
+
+========== FILE: 2025_10_10_131409_migrate_reminders_to_new_schema.php ==========
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
+
+return new class extends Migration {
+
+    /** Check index exists */
+    protected function indexExists(string $table, string $indexName): bool
+    {
+        $schema = DB::getDatabaseName();
+        return DB::table('information_schema.STATISTICS')
+            ->where('TABLE_SCHEMA', $schema)
+            ->where('TABLE_NAME', $table)
+            ->where('INDEX_NAME', $indexName)
+            ->exists();
+    }
+
+    /** Check FK on a column exists */
+    protected function foreignKeyExists(string $table, string $column): bool
+    {
+        $schema = DB::getDatabaseName();
+        return DB::table('information_schema.KEY_COLUMN_USAGE')
+            ->where('TABLE_SCHEMA', $schema)
+            ->where('TABLE_NAME', $table)
+            ->where('COLUMN_NAME', $column)
+            ->whereNotNull('REFERENCED_TABLE_NAME')
+            ->exists();
+    }
+
+    public function up(): void
+    {
+        // 1) Add columns (additive)
+        Schema::table('reminders', function (Blueprint $t) {
+            if (!Schema::hasColumn('reminders', 'contact_id')) {
+                $t->foreignId('contact_id')->nullable()->after('id');
+            }
+            if (!Schema::hasColumn('reminders', 'title')) {
+                $t->string('title')->nullable()->after('owner_user_id');
+            }
+            if (!Schema::hasColumn('reminders', 'note')) {
+                $t->text('note')->nullable()->after('title');
+            }
+            if (!Schema::hasColumn('reminders', 'channel')) {
+                $t->string('channel')->default('app')->after('status');
+            }
+            if (!Schema::hasColumn('reminders', 'external_event_id')) {
+                $t->string('external_event_id')->nullable()->after('channel');
+            }
+            if (!Schema::hasColumn('reminders', 'deleted_at')) {
+                $t->softDeletes();
+            }
+            if (!Schema::hasColumn('reminders', 'due_at')) {
+                $t->dateTime('due_at')->nullable();
+            }
+        });
+
+        // 1.1) Add FK for contact_id if missing
+        if (Schema::hasColumn('reminders', 'contact_id') && ! $this->foreignKeyExists('reminders', 'contact_id')) {
+            Schema::table('reminders', function (Blueprint $t) {
+                $t->foreign('contact_id')->references('id')->on('contacts')->cascadeOnDelete();
+            });
+        }
+
+        // 1.2) Add indexes only if missing
+        if (! $this->indexExists('reminders', 'reminders_due_at_index')) {
+            Schema::table('reminders', fn (Blueprint $t) => $t->index('due_at', 'reminders_due_at_index'));
+        }
+        if (! $this->indexExists('reminders', 'reminders_status_index')) {
+            Schema::table('reminders', fn (Blueprint $t) => $t->index('status', 'reminders_status_index'));
+        }
+
+        // 2) Map data from old columns only if they exist
+        if (Schema::hasColumn('reminders', 'name')) {
+            DB::statement("UPDATE reminders SET title = COALESCE(title, name) WHERE title IS NULL OR title = ''");
+        }
+        if (Schema::hasColumn('reminders', 'description')) {
+            DB::statement("UPDATE reminders SET note = COALESCE(note, description) WHERE note IS NULL OR note = ''");
+        }
+
+        // Normalize status (safe even if already in new values)
+        DB::statement("
+            UPDATE reminders
+            SET status = CASE status
+                WHEN 'open' THEN 'pending'
+                WHEN 'done' THEN 'done'
+                WHEN 'cancelled' THEN 'cancelled'
+                ELSE status
+            END
+        ");
+
+        // 3) Backfill contact_id from pivot (take MIN(contact_id))
+        if (Schema::hasTable('contact_reminder')) {
+            DB::statement("
+                UPDATE reminders r
+                JOIN (
+                  SELECT reminder_id, MIN(contact_id) AS cid
+                  FROM contact_reminder
+                  GROUP BY reminder_id
+                ) x ON x.reminder_id = r.id
+                SET r.contact_id = x.cid
+                WHERE r.contact_id IS NULL
+            ");
+        }
+
+        // 4) Create placeholder contact per owner for remaining NULLs & assign
+        DB::statement("
+            INSERT INTO contacts (owner_user_id, name, job_title, company, email, phone, address, notes, source, created_at, updated_at)
+            SELECT r.owner_user_id,
+                   CONCAT('__UNASSIGNED_CONTACT__ (user ', r.owner_user_id, ')') AS name,
+                   NULL, NULL, NULL, NULL, NULL,
+                   'Auto-created for orphan reminders', 'system', NOW(), NOW()
+            FROM reminders r
+            LEFT JOIN contacts c
+              ON c.owner_user_id = r.owner_user_id
+             AND c.name = CONCAT('__UNASSIGNED_CONTACT__ (user ', r.owner_user_id, ')')
+            WHERE r.contact_id IS NULL
+              AND c.id IS NULL
+            GROUP BY r.owner_user_id
+        ");
+
+        DB::statement("
+            UPDATE reminders r
+            JOIN contacts c
+              ON c.owner_user_id = r.owner_user_id
+             AND c.name = CONCAT('__UNASSIGNED_CONTACT__ (user ', r.owner_user_id, ')')
+            SET r.contact_id = c.id
+            WHERE r.contact_id IS NULL
+        ");
+
+        // (Optional) Enforce NOT NULL once sure there's no NULL remaining:
+        // DB::statement('ALTER TABLE reminders MODIFY contact_id BIGINT UNSIGNED NOT NULL');
+    }
+
+    public function down(): void
+    {
+        // best-effort: drop indexes if exist
+        try { DB::statement('ALTER TABLE reminders DROP INDEX reminders_due_at_index'); } catch (\Throwable $e) {}
+        try { DB::statement('ALTER TABLE reminders DROP INDEX reminders_status_index'); } catch (\Throwable $e) {}
+
+        Schema::table('reminders', function (Blueprint $t) {
+            if (Schema::hasColumn('reminders', 'deleted_at')) $t->dropSoftDeletes();
+            if (Schema::hasColumn('reminders', 'external_event_id')) $t->dropColumn('external_event_id');
+            if (Schema::hasColumn('reminders', 'channel')) $t->dropColumn('channel');
+            if (Schema::hasColumn('reminders', 'note')) $t->dropColumn('note');
+            if (Schema::hasColumn('reminders', 'title')) $t->dropColumn('title');
+
+            if (Schema::hasColumn('reminders', 'contact_id')) {
+                try { $t->dropForeign('reminders_contact_id_foreign'); } catch (\Throwable $e) {}
+                $t->dropColumn('contact_id');
+            }
+        });
+    }
+};
+
+
+
+========== FILE: 2025_10_10_133414_create_contact_reminder_table.php ==========
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
+
+return new class extends Migration {
+    public function up(): void
+    {
+        if (!Schema::hasTable('contact_reminder')) {
+            Schema::create('contact_reminder', function (Blueprint $t) {
+                // $t->engine = 'InnoDB'; // enable if you want to specify engine
+                $t->unsignedBigInteger('contact_id');
+                $t->unsignedBigInteger('reminder_id');
+                $t->timestamps();
+
+                // Composite key to prevent duplicates
+                $t->primary(['contact_id','reminder_id'], 'contact_reminder_pk');
+
+                // Single indexes to optimize queries from one side
+                $t->index('contact_id',  'contact_reminder_contact_idx');
+                $t->index('reminder_id', 'contact_reminder_reminder_idx');
+
+                // FK
+                $t->foreign('contact_id')
+                  ->references('id')->on('contacts')
+                  ->cascadeOnDelete();
+
+                $t->foreign('reminder_id')
+                  ->references('id')->on('reminders')
+                  ->cascadeOnDelete();
+            });
+        }
+
+        // Backfill: add primary contact (reminders.contact_id) to pivot if not exists.
+        // Use anti-join to avoid duplicates and ensure contact/reminder both exist.
+        // MySQL:
+        DB::statement("
+            INSERT INTO contact_reminder (contact_id, reminder_id, created_at, updated_at)
+            SELECT r.contact_id, r.id, NOW(), NOW()
+            FROM reminders r
+            INNER JOIN contacts c ON c.id = r.contact_id
+            LEFT JOIN contact_reminder cr
+                   ON cr.contact_id = r.contact_id
+                  AND cr.reminder_id = r.id
+            WHERE r.contact_id IS NOT NULL
+              AND cr.contact_id IS NULL
+        ");
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('contact_reminder');
+    }
+};
+
+
+
+========== FILE: 2025_10_11_000000_create_user_notifications_table.php ==========
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void {
+        Schema::create('user_notifications', function (Blueprint $t) {
+            $t->id();
+            $t->foreignId('owner_user_id')->constrained('users')->cascadeOnDelete();
+
+            // loại hoạt động
+            $t->string('type'); // contact.created | reminder.created | reminder.upcoming | reminder.done | ...
+            $t->string('title');
+            $t->text('body')->nullable();
+            $t->json('data')->nullable();      // {contact_id, reminder_id, ...}
+
+            // tham chiếu nhanh (tuỳ mục đích UI)
+            $t->unsignedBigInteger('contact_id')->nullable();
+            $t->unsignedBigInteger('reminder_id')->nullable();
+
+            // trạng thái + thời điểm
+            $t->string('status')->default('unread'); // unread|read|done|archived
+            $t->timestamp('scheduled_at')->nullable(); // dùng cho "sắp tới"
+            $t->timestamp('read_at')->nullable();
+            $t->timestamps();
+
+            $t->index(['owner_user_id','status']);
+            $t->index(['owner_user_id','scheduled_at']);
+            $t->index(['reminder_id']);
+            $t->index(['contact_id']);
+        });
+    }
+
+    public function down(): void {
+        Schema::dropIfExists('user_notifications');
+    }
+};
+
+
+
+========== FILE: 2025_10_11_000006_create_countries_and_states_tables.php ==========
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('countries', function (Blueprint $table) {
+            $table->id();
+            $table->string('code', 10)->unique();
+            $table->string('name');
+            $table->timestamps();
+        });
+
+        Schema::create('states', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('country_id')->constrained()->onDelete('cascade');
+            $table->string('code', 20);
+            $table->string('name');
+            $table->timestamps();
+            $table->index(['country_id', 'code']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('states');
+        Schema::dropIfExists('countries');
+    }
+};
+
+
+
+========== FILE: 2025_10_11_000007_create_cities_table.php ==========
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('cities', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('state_id')->constrained()->onDelete('cascade');
+            $table->string('code', 20);
+            $table->string('name');
+            $table->timestamps();
+            $table->index(['state_id', 'code']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('cities');
+    }
+};
+
+
+
+========== FILE: 2025_10_11_000008_create_addresses_table.php ==========
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('addresses', function (Blueprint $table) {
+            $table->id();
+            $table->string('address_detail')->nullable();
+            $table->foreignId('city_id')->nullable()->constrained()->onDelete('set null');
+            $table->foreignId('state_id')->nullable()->constrained()->onDelete('set null');
+            $table->foreignId('country_id')->nullable()->constrained()->onDelete('set null');
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('addresses');
+    }
+};
+
+
+
+========== FILE: 2025_10_11_000010_create_companies_table.php ==========
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('companies', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('tax_code')->unique()->nullable();
+            $table->string('phone')->nullable();
+            $table->string('email')->nullable();
+            $table->string('website')->nullable();
+            $table->foreignId('address_id')->nullable()->constrained('addresses')->onDelete('set null');
+            $table->text('description')->nullable();
+            $table->string('logo')->nullable();
+            $table->timestamps();
+            $table->softDeletes();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('companies');
+    }
+};
+
+
+
+========== FILE: 2025_10_11_000011_create_business_cards_table.php ==========
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('business_cards', function (Blueprint $table) {
+            $table->id();
+            $table->string('slug')->unique()->nullable();
+            $table->foreignId('user_id')->unique()->constrained()->onDelete('cascade');
+            $table->foreignId('company_id')->nullable()->constrained()->onDelete('set null');
+            $table->string('full_name');
+            $table->string('job_title')->nullable();
+            $table->string('department')->nullable();
+            $table->string('email');
+            $table->string('phone')->nullable();
+            $table->string('mobile')->nullable();
+            $table->string('website')->nullable();
+            $table->foreignId('address_id')->nullable()->constrained('addresses')->onDelete('set null');
+            $table->string('linkedin')->nullable();
+            $table->string('facebook')->nullable();
+            $table->string('twitter')->nullable();
+            $table->string('avatar')->nullable();
+            $table->text('notes')->nullable();
+            $table->boolean('is_public')->default(true);
+            $table->integer('view_count')->default(0);
+            $table->timestamps();
+            $table->softDeletes();
+            $table->index(['user_id', 'company_id', 'email']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('business_cards');
+    }
+};
+
+
+
+========== FILE: 2025_10_11_000013_add_foreign_keys_to_users_table.php ==========
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->foreign('company_id')->references('id')->on('companies')->onDelete('set null');
+            $table->foreign('business_card_id')->references('id')->on('business_cards')->onDelete('set null');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropForeign(['company_id']);
+            $table->dropForeign(['business_card_id']);
+        });
+    }
+};
+
+
+
