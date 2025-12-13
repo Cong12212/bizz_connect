@@ -7,11 +7,11 @@ return [
     // ✅ Cho phép tất cả localhost bằng pattern
     'allowed_origins' => [
         'https://bizz-connect-web.onrender.com',
-        // 'https://app.yourdomain.com',
+        'https://biz-connect.online',
     ],
     'allowed_origins_patterns' => [
-        '/^http:\/\/localhost:\d+$/',     
-        '/^http:\/\/127\.0\.0\.1:\d+$/',  
+        '/^http:\/\/localhost:\d+$/',
+        '/^http:\/\/127\.0\.0\.1:\d+$/',
     ],
 
     'allowed_headers' => ['*'],
