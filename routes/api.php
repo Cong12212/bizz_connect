@@ -12,6 +12,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\BusinessCardController;
 use App\Http\Controllers\LocationController;
+use App\Http\Controllers\GuideController;
 
 /**
  * AUTH (public)
@@ -29,6 +30,8 @@ Route::prefix('auth')->group(function () {
 Route::get('email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
     ->middleware(['signed'])
     ->name('verification.verify');
+
+
 
 Route::middleware('auth:sanctum')->get('email/verified', fn(Request $r) => [
     'verified' => (bool) $r->user()->hasVerifiedEmail(),
@@ -128,4 +131,11 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
             ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
             ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     })->where('any', '.*');
+});
+
+Route::prefix('guides')->group(function () {
+    Route::post('/generate', [GuideController::class, 'generate']);
+    Route::post('/stream', [GuideController::class, 'stream']);
+    Route::get('/categories', [GuideController::class, 'getCategories']);
+    Route::get('/category/{category}', [GuideController::class, 'getByCategory']);
 });
