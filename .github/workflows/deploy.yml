@@ -109,10 +109,10 @@ jobs:
             php artisan view:clear
 
             echo "===== Testing database connection ====="
-            php artisan db:show || echo "Database connection failed - check credentials"
+            php artisan db:show
 
             echo "===== Running migrations ====="
-            php artisan migrate --force || echo "Migration failed"
+            php artisan migrate --force --verbose
 
             echo "===== Migration status ====="
             php artisan migrate:status
