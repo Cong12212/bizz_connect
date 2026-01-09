@@ -65,7 +65,7 @@ jobs:
             DB_PORT=3306
             DB_DATABASE=${{ secrets.DB_DATABASE }}
             DB_USERNAME=${{ secrets.DB_USERNAME }}
-            DB_PASSWORD=${{ secrets.DB_DATABASE }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
 
             SESSION_DRIVER=file
             SESSION_LIFETIME=120
@@ -83,6 +83,7 @@ jobs:
 
             L5_SWAGGER_CONST_HOST=https://biz-connect.online/backend/public
             L5_SWAGGER_GENERATE_ALWAYS=true
+            L5_SWAGGER_USE_ABSOLUTE_PATH=false
 
             GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
             EOF
@@ -98,7 +99,8 @@ jobs:
 
             echo "===== Setting permissions ====="
             chmod -R 775 storage bootstrap/cache
-            chmod -R 664 storage/logs
+            find storage -type f -exec chmod 664 {} \;
+            find storage -type d -exec chmod 775 {} \;
 
             echo "===== Clearing all caches ====="
             php artisan config:clear
