@@ -19,14 +19,33 @@ class AiGuideController extends Controller
     }
 
     /**
-     * Ask AI a question
-     * POST /api/ai-guide/ask
-     * 
-     * Body: {
-     *   "question": "Làm sao thêm danh bạ?",
-     *   "platform": "web",
-     *   "locale": "vi"
-     * }
+     * @OA\Post(
+     *   path="/api/ai-guide/ask",
+     *   tags={"AI Guide"},
+     *   summary="Ask AI a question",
+     *   @OA\RequestBody(
+     *     required=true,
+     *     @OA\JsonContent(
+     *       required={"question","platform"},
+     *       @OA\Property(property="question", type="string", maxLength=500, example="How to add a contact?"),
+     *       @OA\Property(property="platform", type="string", enum={"web","mobile"}, example="web"),
+     *       @OA\Property(property="locale", type="string", enum={"vi","en"}, example="en", nullable=true)
+     *     )
+     *   ),
+     *   @OA\Response(
+     *     response=200,
+     *     description="Answer from knowledge base or AI",
+     *     @OA\JsonContent(
+     *       type="object",
+     *       @OA\Property(property="success", type="boolean"),
+     *       @OA\Property(property="source", type="string", enum={"knowledge_base","gemini_ai"}),
+     *       @OA\Property(property="answer", type="object"),
+     *       @OA\Property(property="knowledge_id", type="integer", nullable=true)
+     *     )
+     *   ),
+     *   @OA\Response(response=422, description="Validation error"),
+     *   @OA\Response(response=500, description="AI generation failed")
+     * )
      */
     public function ask(Request $request): JsonResponse
     {
@@ -47,11 +66,11 @@ class AiGuideController extends Controller
         $platform = $request->input('platform');
         $locale = $request->input('locale', 'vi');
 
-        // Step 1: Search trong database trước
+        // Step 1: Search in database first
         $knowledge = $this->searchKnowledge($question, $platform, $locale);
 
         if ($knowledge) {
-            // Tìm thấy trong KB → Trả về ngay
+            // Found in knowledge base - return immediately
             $knowledge->increment('view_count');
 
             return response()->json([
@@ -62,13 +81,34 @@ class AiGuideController extends Controller
             ]);
         }
 
-        // Step 2: Không tìm thấy → Dùng Gemini AI
+        // Step 2: Not found - use Gemini AI
         return $this->askGemini($question, $platform, $locale);
     }
 
     /**
-     * Ask AI với streaming response
-     * POST /api/ai-guide/ask-stream
+     * @OA\Post(
+     *   path="/api/ai-guide/ask-stream",
+     *   tags={"AI Guide"},
+     *   summary="Ask AI with streaming response (Server-Sent Events)",
+     *   @OA\RequestBody(
+     *     required=true,
+     *     @OA\JsonContent(
+     *       required={"question","platform"},
+     *       @OA\Property(property="question", type="string", maxLength=500, example="How to add a contact?"),
+     *       @OA\Property(property="platform", type="string", enum={"web","mobile"}, example="web"),
+     *       @OA\Property(property="locale", type="string", enum={"vi","en"}, example="en", nullable=true)
+     *     )
+     *   ),
+     *   @OA\Response(
+     *     response=200,
+     *     description="Streaming response (text/event-stream)",
+     *     @OA\MediaType(
+     *       mediaType="text/event-stream",
+     *       @OA\Schema(type="string")
+     *     )
+     *   ),
+     *   @OA\Response(response=422, description="Validation error")
+     * )
      */
     public function askStream(Request $request)
     {
@@ -102,8 +142,34 @@ class AiGuideController extends Controller
     }
 
     /**
-     * Get all categories
-     * GET /api/ai-guide/categories?locale=vi&platform=web
+     * @OA\Get(
+     *   path="/api/ai-guide/categories",
+     *   tags={"AI Guide"},
+     *   summary="Get all knowledge categories",
+     *   @OA\Parameter(
+     *     name="locale",
+     *     in="query",
+     *     @OA\Schema(type="string", enum={"vi","en"}, default="vi")
+     *   ),
+     *   @OA\Parameter(
+     *     name="platform",
+     *     in="query",
+     *     @OA\Schema(type="string", enum={"web","mobile","all"}, default="all")
+     *   ),
+     *   @OA\Response(
+     *     response=200,
+     *     description="List of categories",
+     *     @OA\JsonContent(
+     *       type="object",
+     *       @OA\Property(property="success", type="boolean", example=true),
+     *       @OA\Property(
+     *         property="categories",
+     *         type="array",
+     *         @OA\Items(type="string")
+     *       )
+     *     )
+     *   )
+     * )
      */
     public function getCategories(Request $request): JsonResponse
     {
@@ -124,8 +190,49 @@ class AiGuideController extends Controller
     }
 
     /**
-     * Get knowledge by category
-     * GET /api/ai-guide/category/{category}?locale=vi&platform=web
+     * @OA\Get(
+     *   path="/api/ai-guide/category/{category}",
+     *   tags={"AI Guide"},
+     *   summary="Get knowledge items by category",
+     *   @OA\Parameter(
+     *     name="category",
+     *     in="path",
+     *     required=true,
+     *     @OA\Schema(type="string", example="contact_management")
+     *   ),
+     *   @OA\Parameter(
+     *     name="locale",
+     *     in="query",
+     *     @OA\Schema(type="string", enum={"vi","en"}, default="vi")
+     *   ),
+     *   @OA\Parameter(
+     *     name="platform",
+     *     in="query",
+     *     @OA\Schema(type="string", enum={"web","mobile","all"}, default="all")
+     *   ),
+     *   @OA\Response(
+     *     response=200,
+     *     description="Knowledge items in category",
+     *     @OA\JsonContent(
+     *       type="object",
+     *       @OA\Property(property="success", type="boolean", example=true),
+     *       @OA\Property(property="category", type="string"),
+     *       @OA\Property(property="total", type="integer"),
+     *       @OA\Property(
+     *         property="items",
+     *         type="array",
+     *         @OA\Items(
+     *           type="object",
+     *           @OA\Property(property="id", type="integer"),
+     *           @OA\Property(property="key", type="string"),
+     *           @OA\Property(property="title", type="string"),
+     *           @OA\Property(property="description", type="string"),
+     *           @OA\Property(property="steps_count", type="integer")
+     *         )
+     *       )
+     *     )
+     *   )
+     * )
      */
     public function getByCategory(Request $request, string $category): JsonResponse
     {
@@ -140,11 +247,11 @@ class AiGuideController extends Controller
             ->orderBy('view_count', 'desc')
             ->get(['id', 'key', 'title', 'content']);
 
-        // Format content cho từng item
+        // Format content for each item
         $items = $knowledge->map(function ($item) use ($platform) {
             $content = $item->content;
 
-            // Lấy steps count theo platform
+            // Get steps count by platform
             $stepsKey = $platform === 'mobile' ? 'mobile' : 'web';
             $steps = $content['steps'][$stepsKey]
                 ?? $content['steps']['web']
@@ -169,8 +276,53 @@ class AiGuideController extends Controller
     }
 
     /**
-     * Get knowledge detail by key
-     * GET /api/ai-guide/knowledge/{key}?locale=vi&platform=web
+     * @OA\Get(
+     *   path="/api/ai-guide/knowledge/{key}",
+     *   tags={"AI Guide"},
+     *   summary="Get knowledge detail by key",
+     *   @OA\Parameter(
+     *     name="key",
+     *     in="path",
+     *     required=true,
+     *     @OA\Schema(type="string", example="add_contact")
+     *   ),
+     *   @OA\Parameter(
+     *     name="locale",
+     *     in="query",
+     *     @OA\Schema(type="string", enum={"vi","en"}, default="vi")
+     *   ),
+     *   @OA\Parameter(
+     *     name="platform",
+     *     in="query",
+     *     @OA\Schema(type="string", enum={"web","mobile"}, default="web")
+     *   ),
+     *   @OA\Response(
+     *     response=200,
+     *     description="Knowledge detail",
+     *     @OA\JsonContent(
+     *       type="object",
+     *       @OA\Property(property="success", type="boolean", example=true),
+     *       @OA\Property(
+     *         property="knowledge",
+     *         type="object",
+     *         @OA\Property(property="id", type="integer"),
+     *         @OA\Property(property="key", type="string"),
+     *         @OA\Property(property="title", type="string"),
+     *         @OA\Property(property="category", type="string"),
+     *         @OA\Property(property="platform", type="string"),
+     *         @OA\Property(property="description", type="string"),
+     *         @OA\Property(property="steps", type="array", @OA\Items(type="string")),
+     *         @OA\Property(property="tips", type="array", @OA\Items(type="string")),
+     *         @OA\Property(property="notes", type="array", @OA\Items(type="string")),
+     *         @OA\Property(property="common_errors", type="array", @OA\Items(type="object")),
+     *         @OA\Property(property="images", type="array", @OA\Items(type="string")),
+     *         @OA\Property(property="video_url", type="string", nullable=true),
+     *         @OA\Property(property="related", type="array", @OA\Items(type="object"))
+     *       )
+     *     )
+     *   ),
+     *   @OA\Response(response=404, description="Knowledge not found")
+     * )
      */
     public function getKnowledge(Request $request, string $key): JsonResponse
     {
@@ -198,8 +350,46 @@ class AiGuideController extends Controller
     }
 
     /**
-     * Get popular/trending knowledge
-     * GET /api/ai-guide/popular?locale=vi&platform=web&limit=5
+     * @OA\Get(
+     *   path="/api/ai-guide/popular",
+     *   tags={"AI Guide"},
+     *   summary="Get popular/trending knowledge items",
+     *   @OA\Parameter(
+     *     name="locale",
+     *     in="query",
+     *     @OA\Schema(type="string", enum={"vi","en"}, default="vi")
+     *   ),
+     *   @OA\Parameter(
+     *     name="platform",
+     *     in="query",
+     *     @OA\Schema(type="string", enum={"web","mobile","all"}, default="all")
+     *   ),
+     *   @OA\Parameter(
+     *     name="limit",
+     *     in="query",
+     *     @OA\Schema(type="integer", default=5, minimum=1, maximum=20)
+     *   ),
+     *   @OA\Response(
+     *     response=200,
+     *     description="Popular knowledge items",
+     *     @OA\JsonContent(
+     *       type="object",
+     *       @OA\Property(property="success", type="boolean", example=true),
+     *       @OA\Property(
+     *         property="popular",
+     *         type="array",
+     *         @OA\Items(
+     *           type="object",
+     *           @OA\Property(property="id", type="integer"),
+     *           @OA\Property(property="key", type="string"),
+     *           @OA\Property(property="title", type="string"),
+     *           @OA\Property(property="category", type="string"),
+     *           @OA\Property(property="view_count", type="integer")
+     *         )
+     *       )
+     *     )
+     *   )
+     * )
      */
     public function getPopular(Request $request): JsonResponse
     {
@@ -222,8 +412,48 @@ class AiGuideController extends Controller
     }
 
     /**
-     * Search knowledge (cho autocomplete/suggestions)
-     * GET /api/ai-guide/search?q=thêm danh bạ&locale=vi&platform=web
+     * @OA\Get(
+     *   path="/api/ai-guide/search",
+     *   tags={"AI Guide"},
+     *   summary="Search knowledge (for autocomplete/suggestions)",
+     *   @OA\Parameter(
+     *     name="q",
+     *     in="query",
+     *     required=true,
+     *     @OA\Schema(type="string", minLength=2, example="add contact")
+     *   ),
+     *   @OA\Parameter(
+     *     name="locale",
+     *     in="query",
+     *     @OA\Schema(type="string", enum={"vi","en"}, default="vi")
+     *   ),
+     *   @OA\Parameter(
+     *     name="platform",
+     *     in="query",
+     *     @OA\Schema(type="string", enum={"web","mobile","all"}, default="all")
+     *   ),
+     *   @OA\Response(
+     *     response=200,
+     *     description="Search results",
+     *     @OA\JsonContent(
+     *       type="object",
+     *       @OA\Property(property="success", type="boolean", example=true),
+     *       @OA\Property(property="query", type="string"),
+     *       @OA\Property(
+     *         property="results",
+     *         type="array",
+     *         @OA\Items(
+     *           type="object",
+     *           @OA\Property(property="id", type="integer"),
+     *           @OA\Property(property="key", type="string"),
+     *           @OA\Property(property="title", type="string"),
+     *           @OA\Property(property="category", type="string")
+     *         )
+     *       )
+     *     )
+     *   ),
+     *   @OA\Response(response=400, description="Query too short")
+     * )
      */
     public function search(Request $request): JsonResponse
     {
@@ -260,7 +490,7 @@ class AiGuideController extends Controller
     // ==================== PRIVATE METHODS ====================
 
     /**
-     * Search knowledge trong database
+     * Search knowledge in database
      */
     private function searchKnowledge(string $question, string $platform, string $locale): ?AppKnowledge
     {
@@ -270,21 +500,21 @@ class AiGuideController extends Controller
             ->byLocale($locale)
             ->byPlatform($platform)
             ->where(function ($query) use ($keywords, $question) {
-                // Search trong searchable_text
+                // Search in searchable_text
                 foreach ($keywords as $keyword) {
                     $query->orWhere('searchable_text', 'like', "%{$keyword}%");
                 }
 
-                // Search trong title
+                // Search in title
                 $query->orWhere('title', 'like', "%{$question}%");
 
-                // Search trong sample_questions
+                // Search in sample_questions
                 $query->orWhereRaw(
                     "JSON_SEARCH(sample_questions, 'one', ?) IS NOT NULL",
                     ["%{$question}%"]
                 );
 
-                // Search trong keywords
+                // Search in keywords
                 foreach ($keywords as $keyword) {
                     $query->orWhereRaw(
                         "JSON_SEARCH(keywords, 'one', ?) IS NOT NULL",
@@ -298,11 +528,11 @@ class AiGuideController extends Controller
     }
 
     /**
-     * Extract keywords từ câu hỏi
+     * Extract keywords from question
      */
     private function extractKeywords(string $text): array
     {
-        // Vietnamese stop words
+        // Vietnamese and English stop words
         $stopWords = [
             'là',
             'của',
@@ -336,30 +566,30 @@ class AiGuideController extends Controller
             'could'
         ];
 
-        // Lowercase và split
+        // Lowercase and split
         $words = preg_split('/\s+/', mb_strtolower($text));
 
-        // Filter stop words và từ ngắn
+        // Filter stop words and short words
         return array_values(array_filter($words, function ($word) use ($stopWords) {
             return mb_strlen($word) > 2 && !in_array($word, $stopWords);
         }));
     }
 
     /**
-     * Format answer từ knowledge base
+     * Format answer from knowledge base
      */
     private function formatAnswer(AppKnowledge $knowledge, string $platform): array
     {
         $content = $knowledge->content;
 
-        // Lấy steps theo platform (ưu tiên platform được chọn)
+        // Get steps by platform (prioritize selected platform)
         $stepsKey = $platform === 'mobile' ? 'mobile' : 'web';
         $steps = $content['steps'][$stepsKey]
             ?? $content['steps']['web']
             ?? $content['steps']['mobile']
             ?? [];
 
-        // Lấy images theo platform
+        // Get images by platform
         $images = $content['media']['images'][$platform]
             ?? $content['media']['images']['web']
             ?? $content['media']['images']['mobile']
@@ -409,7 +639,7 @@ class AiGuideController extends Controller
      */
     private function askGemini(string $question, string $platform, string $locale): JsonResponse
     {
-        // Build context cho Gemini
+        // Build context for Gemini
         $context = [
             'platform' => $platform,
             'locale' => $locale
@@ -477,7 +707,7 @@ class AiGuideController extends Controller
                 ]) . "\n\n";
                 if (ob_get_level() > 0) ob_flush();
                 flush();
-                usleep(100000); // 100ms delay cho smooth
+                usleep(100000); // 100ms delay for smooth streaming
             }
 
             // Stream tips
