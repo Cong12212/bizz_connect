@@ -77,13 +77,13 @@ jobs:
             QUEUE_CONNECTION=database
 
             MAIL_MAILER=smtp
-            MAIL_HOST=smtp.gmail.com
-            MAIL_PORT=587
-            MAIL_ENCRYPTION=tls
+            MAIL_HOST=smtp.hostinger.com
+            MAIL_PORT=465
+            MAIL_ENCRYPTION=ssl
             MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
             MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
             MAIL_FROM_ADDRESS=${{ secrets.MAIL_USERNAME }}
-            MAIL_FROM_NAME="BizConnect"
+            MAIL_FROM_NAME="Biz Connect"
 
             L5_SWAGGER_CONST_HOST=https://biz-connect.online/backend/public
             L5_SWAGGER_GENERATE_ALWAYS=true
