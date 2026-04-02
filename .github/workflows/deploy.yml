@@ -80,9 +80,9 @@ jobs:
             MAIL_HOST=smtp.hostinger.com
             MAIL_PORT=465
             MAIL_ENCRYPTION=ssl
-            MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
-            MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
-            MAIL_FROM_ADDRESS=${{ secrets.MAIL_USERNAME }}
+            MAIL_USERNAME="${{ secrets.MAIL_USERNAME }}"
+            MAIL_PASSWORD="${{ secrets.MAIL_PASSWORD }}"
+            MAIL_FROM_ADDRESS="${{ secrets.MAIL_USERNAME }}"
             MAIL_FROM_NAME="Biz Connect"
 
             L5_SWAGGER_CONST_HOST=https://biz-connect.online/backend/public
