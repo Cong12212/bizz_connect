@@ -123,13 +123,9 @@ class ContactController extends Controller
             }
             if (!empty($tagNames)) {
                 if ($mode === 'all') {
-                    // Resolve names to IDs first (1 query), then reuse subquery pattern.
+                    // Resolve exact names to IDs first (1 query), then reuse subquery pattern.
                     $resolvedIds = Tag::where('owner_user_id', $r->user()->id)
-                        ->where(function ($t) use ($tagNames) {
-                            foreach ($tagNames as $name) {
-                                $t->orWhere('name', 'like', "%{$name}%");
-                            }
-                        })
+                        ->whereIn('name', $tagNames)
                         ->pluck('id')
                         ->all();
 
@@ -144,11 +140,7 @@ class ContactController extends Controller
                     }
                 } else {
                     $q->whereHas('tags', function ($t) use ($tagNames) {
-                        $t->where(function ($sub) use ($tagNames) {
-                            foreach ($tagNames as $name) {
-                                $sub->orWhere('tags.name', 'like', "%{$name}%");
-                            }
-                        });
+                        $t->whereIn('tags.name', $tagNames);
                     });
                 }
             }
@@ -161,8 +153,7 @@ class ContactController extends Controller
                 if (is_numeric($val)) {
                     $t->where('tags.id', (int)$val);
                 } else {
-                    // Thay đổi: search LIKE
-                    $t->where('tags.name', 'like', '%' . ltrim((string)$val, '#') . '%');
+                    $t->where('tags.name', ltrim((string)$val, '#'));
                 }
             });
         }
