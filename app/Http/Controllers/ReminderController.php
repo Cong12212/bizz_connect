@@ -150,7 +150,7 @@ class ReminderController extends Controller
         $data = $r->validate([
             'title'   => 'required|string|max:255',
             'note'    => 'nullable|string',
-            'due_at'  => 'required|date',
+            'due_at'  => 'required|date|after_or_equal:now',
             'status'  => ['nullable', Rule::in(['pending', 'done', 'skipped', 'cancelled'])],
             'channel' => ['nullable', Rule::in(['app', 'email', 'calendar'])],
 
@@ -169,6 +169,7 @@ class ReminderController extends Controller
             'title.max' => 'The title field must not be greater than 255 characters.',
             'due_at.required' => 'The due_at field is required.',
             'due_at.date' => 'The due_at is not a valid date.',
+            'due_at.after_or_equal' => 'The due_at must be a date after or equal to now.',
             'status.in' => 'The selected status is invalid.',
             'channel.in' => 'The selected channel is invalid.',
             'contact_id.exists' => 'The selected contact_id is invalid.',
@@ -245,7 +246,7 @@ class ReminderController extends Controller
         $data = $r->validate([
             'title'   => 'sometimes|string|max:255',
             'note'    => 'sometimes|nullable|string',
-            'due_at'  => 'sometimes|nullable|date',
+            'due_at'  => 'sometimes|nullable|date|after_or_equal:now',
             'status'  => ['sometimes', Rule::in(['pending', 'done', 'skipped', 'cancelled'])],
             'channel' => ['sometimes', Rule::in(['app', 'email', 'calendar'])],
             'contact_id'  => ['sometimes', 'integer', Rule::exists('contacts', 'id')->where(fn($q) => $q->where('owner_user_id', $uid))],
@@ -254,6 +255,7 @@ class ReminderController extends Controller
         ], [
             'title.max' => 'The title field must not be greater than 255 characters.',
             'due_at.date' => 'The due_at is not a valid date.',
+            'due_at.after_or_equal' => 'The due_at must be a date after or equal to now.',
             'status.in' => 'The selected status is invalid.',
             'channel.in' => 'The selected channel is invalid.',
             'contact_id.exists' => 'The selected contact_id is invalid.',
