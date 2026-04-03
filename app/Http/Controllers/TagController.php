@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Contact;
 use App\Models\Tag;
 use Illuminate\Http\Request;
 
@@ -158,6 +159,44 @@ class TagController extends Controller
         abort_unless($tag->owner_user_id === $r->user()->id, 403);
         $tag->delete();
         return response()->noContent();
+    }
+
+    /**
+     * POST /tags/{tag}/contacts
+     * Bulk-attach contacts to a tag.
+     * Body: { contact_ids: [1, 2, 3] }
+     */
+    public function attachContacts(Request $r, Tag $tag)
+    {
+        abort_unless($tag->owner_user_id === $r->user()->id, 403);
+
+        $data = $r->validate(['contact_ids' => 'required|array', 'contact_ids.*' => 'integer']);
+
+        // Verify contacts belong to the authenticated user
+        $validIds = Contact::where('owner_user_id', $r->user()->id)
+            ->whereIn('id', $data['contact_ids'])
+            ->pluck('id')
+            ->toArray();
+
+        $tag->contacts()->syncWithoutDetaching($validIds);
+
+        return response()->json($tag->loadCount('contacts'));
+    }
+
+    /**
+     * DELETE /tags/{tag}/contacts
+     * Bulk-detach contacts from a tag.
+     * Body: { contact_ids: [1, 2, 3] }
+     */
+    public function detachContacts(Request $r, Tag $tag)
+    {
+        abort_unless($tag->owner_user_id === $r->user()->id, 403);
+
+        $data = $r->validate(['contact_ids' => 'required|array', 'contact_ids.*' => 'integer']);
+
+        $tag->contacts()->detach($data['contact_ids']);
+
+        return response()->json($tag->loadCount('contacts'));
     }
 
     private function normalize(string $name): string

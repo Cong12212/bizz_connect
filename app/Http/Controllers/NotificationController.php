@@ -37,8 +37,8 @@ class NotificationController extends Controller
      */
     public function index(Request $request)
     {
-        $uid = $request->user()->id;
-        $limit = min(20, (int)$request->query('limit', 20));
+        $uid  = $request->user()->id;
+        $per  = min(50, (int) $request->query('per_page', 20));
         $scope = $request->query('scope', 'all');
 
         $q = UserNotification::where('owner_user_id', $uid);
@@ -55,9 +55,7 @@ class NotificationController extends Controller
 
         $q->orderByRaw('COALESCE(scheduled_at, created_at) DESC, id DESC');
 
-        return [
-            'data' => $q->limit($limit)->get(),
-        ];
+        return $q->paginate($per);
     }
 
     /**

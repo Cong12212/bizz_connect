@@ -61,13 +61,24 @@ class ContactController extends Controller
         $textTerm     = $this->stripHashtags($rawQ);
 
         if ($textTerm !== '') {
-            $term = "%{$textTerm}%";
-            $q->where(function ($w) use ($term) {
-                $w->where('name', 'like', $term)
-                    ->orWhere('email', 'like', $term)
-                    ->orWhere('phone', 'like', $term)
-                    ->orWhere('company', 'like', $term);
-            });
+            if (mb_strlen($textTerm) >= 3) {
+                // Use the existing FULLTEXT index on (name, company, email, phone).
+                // Strip FULLTEXT operator chars to avoid syntax errors.
+                $fts = preg_replace('/[+\-><()~*"@]/', '', $textTerm);
+                $q->whereRaw(
+                    'MATCH(name, company, email, phone) AGAINST(? IN BOOLEAN MODE)',
+                    [$fts . '*']
+                );
+            } else {
+                // Short terms: prefix LIKE on indexed columns (no leading %).
+                $prefix = $textTerm . '%';
+                $q->where(function ($w) use ($prefix, $textTerm) {
+                    $w->where('name', 'like', $prefix)
+                        ->orWhere('email', 'like', $prefix)
+                        ->orWhere('phone', 'like', '%' . $textTerm . '%') // phones may have country code prefix
+                        ->orWhere('company', 'like', $prefix);
+                });
+            }
         }
 
         // ===== tag_ids / tags + mode =====
@@ -97,17 +108,39 @@ class ContactController extends Controller
 
             if (!empty($tagIds)) {
                 if ($mode === 'all') {
-                    foreach ($tagIds as $id) {
-                        $q->whereHas('tags', fn($t) => $t->where('tags.id', $id));
-                    }
+                    // Single subquery with HAVING COUNT instead of N correlated EXISTS.
+                    // Uses the (tag_id, contact_id) covering index on contact_tag.
+                    $q->whereIn('contacts.id', function ($sub) use ($tagIds) {
+                        $sub->select('contact_id')
+                            ->from('contact_tag')
+                            ->whereIn('tag_id', $tagIds)
+                            ->groupBy('contact_id')
+                            ->havingRaw('COUNT(DISTINCT tag_id) = ?', [count($tagIds)]);
+                    });
                 } else {
                     $q->whereHas('tags', fn($t) => $t->whereIn('tags.id', $tagIds));
                 }
             }
             if (!empty($tagNames)) {
                 if ($mode === 'all') {
-                    foreach ($tagNames as $name) {
-                        $q->whereHas('tags', fn($t) => $t->where('tags.name', 'like', "%{$name}%"));
+                    // Resolve names to IDs first (1 query), then reuse subquery pattern.
+                    $resolvedIds = Tag::where('owner_user_id', $r->user()->id)
+                        ->where(function ($t) use ($tagNames) {
+                            foreach ($tagNames as $name) {
+                                $t->orWhere('name', 'like', "%{$name}%");
+                            }
+                        })
+                        ->pluck('id')
+                        ->all();
+
+                    if (!empty($resolvedIds)) {
+                        $q->whereIn('contacts.id', function ($sub) use ($resolvedIds) {
+                            $sub->select('contact_id')
+                                ->from('contact_tag')
+                                ->whereIn('tag_id', $resolvedIds)
+                                ->groupBy('contact_id')
+                                ->havingRaw('COUNT(DISTINCT tag_id) = ?', [count($resolvedIds)]);
+                        });
                     }
                 } else {
                     $q->whereHas('tags', function ($t) use ($tagNames) {

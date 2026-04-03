@@ -92,6 +92,8 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
     Route::post('/tags', [TagController::class, 'store']);
     Route::put('/tags/{tag}', [TagController::class, 'update'])->whereNumber('tag');
     Route::delete('/tags/{tag}', [TagController::class, 'destroy'])->whereNumber('tag');
+    Route::post('/tags/{tag}/contacts', [TagController::class, 'attachContacts'])->whereNumber('tag');
+    Route::delete('/tags/{tag}/contacts', [TagController::class, 'detachContacts'])->whereNumber('tag');
 
     Route::get('/reminders', [ReminderController::class, 'index']);
     Route::post('/reminders', [ReminderController::class, 'store']);
