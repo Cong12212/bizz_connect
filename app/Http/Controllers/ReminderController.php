@@ -164,6 +164,17 @@ class ReminderController extends Controller
                 'integer',
                 Rule::exists('contacts', 'id')->where(fn($q) => $q->where('owner_user_id', $uid)),
             ],
+        ], [
+            'title.required' => 'The title field is required.',
+            'title.max' => 'The title field must not be greater than 255 characters.',
+            'due_at.required' => 'The due_at field is required.',
+            'due_at.date' => 'The due_at is not a valid date.',
+            'status.in' => 'The selected status is invalid.',
+            'channel.in' => 'The selected channel is invalid.',
+            'contact_id.exists' => 'The selected contact_id is invalid.',
+            'contact_ids.array' => 'The contact_ids field must be an array.',
+            'contact_ids.min' => 'The contact_ids field must have at least 1 item.',
+            'contact_ids.*.exists' => 'One or more selected contacts are invalid.',
         ]);
 
         $ids = collect($data['contact_ids'] ?? [])
@@ -240,6 +251,15 @@ class ReminderController extends Controller
             'contact_id'  => ['sometimes', 'integer', Rule::exists('contacts', 'id')->where(fn($q) => $q->where('owner_user_id', $uid))],
             'contact_ids' => ['sometimes', 'array', 'min:1'],
             'contact_ids.*' => ['integer', Rule::exists('contacts', 'id')->where(fn($q) => $q->where('owner_user_id', $uid))],
+        ], [
+            'title.max' => 'The title field must not be greater than 255 characters.',
+            'due_at.date' => 'The due_at is not a valid date.',
+            'status.in' => 'The selected status is invalid.',
+            'channel.in' => 'The selected channel is invalid.',
+            'contact_id.exists' => 'The selected contact_id is invalid.',
+            'contact_ids.array' => 'The contact_ids field must be an array.',
+            'contact_ids.min' => 'The contact_ids field must have at least 1 item.',
+            'contact_ids.*.exists' => 'One or more selected contacts are invalid.',
         ]);
 
         return DB::transaction(function () use ($reminder, $data, $uid) {
@@ -493,7 +513,8 @@ class ReminderController extends Controller
 
             if ((int)$reminder->contact_id === (int)$contact) {
                 $next = $reminder->contacts()->orderBy('contacts.id')->first();
-                $reminder->contact_id = $next?->id; // can be null if no one left
+                // In many-to-many mode, primary contact can be null when no related contacts remain.
+                $reminder->contact_id = $next?->id;
                 $reminder->save();
             }
             return ['ok' => true];
