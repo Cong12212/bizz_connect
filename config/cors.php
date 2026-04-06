@@ -8,6 +8,7 @@ return [
     'allowed_origins' => [
         'https://bizz-connect-web.onrender.com',
         'https://biz-connect.online',
+        'https://test.biz-connect.online',
     ],
     'allowed_origins_patterns' => [
         '/^http:\/\/localhost:\d+$/',
