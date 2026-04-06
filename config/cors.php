@@ -13,6 +13,7 @@ return [
     'allowed_origins_patterns' => [
         '/^http:\/\/localhost:\d+$/',
         '/^http:\/\/127\.0\.0\.1:\d+$/',
+        '/^https:\/\/.*\.biz-connect\.online$/',
     ],
 
     'allowed_headers' => ['*'],
