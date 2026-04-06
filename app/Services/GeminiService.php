@@ -446,4 +446,61 @@ INSTRUCTION;
             }
         }
     }
+
+    /**
+     * Extract business card info from an image using Gemini Vision.
+     * Returns structured JSON with contact fields.
+     */
+    public function extractBusinessCardInfo(string $imagePath, string $mimeType = 'image/jpeg'): array
+    {
+        $imageData = base64_encode(file_get_contents($imagePath));
+
+        $url = "{$this->baseUrl}/models/{$this->model}:generateContent?key={$this->apiKey}";
+
+        $prompt = <<<PROMPT
+You are a business card OCR assistant. Extract all contact information from this business card image and return ONLY a valid JSON object with these fields (use null for missing fields):
+{
+  "full_name": string or null,
+  "job_title": string or null,
+  "department": string or null,
+  "email": string or null,
+  "phone": string or null,
+  "mobile": string or null,
+  "website": string or null,
+  "linkedin": string or null,
+  "company": string or null,
+  "address_detail": string or null
+}
+Return ONLY the JSON, no markdown, no explanation.
+PROMPT;
+
+        $response = Http::timeout(30)
+            ->withoutVerifying()
+            ->withHeaders(['Content-Type' => 'application/json'])
+            ->post($url, [
+                'contents' => [[
+                    'parts' => [
+                        ['text' => $prompt],
+                        ['inline_data' => ['mime_type' => $mimeType, 'data' => $imageData]],
+                    ]
+                ]],
+                'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 512],
+            ]);
+
+        if (!$response->successful()) {
+            throw new \Exception('Gemini Vision API failed: ' . $response->status());
+        }
+
+        $text = $response->json('candidates.0.content.parts.0.text', '');
+        // Strip markdown code fences if present
+        $text = preg_replace('/^```(?:json)?\s*/i', '', trim($text));
+        $text = preg_replace('/\s*```$/', '', $text);
+
+        $data = json_decode($text, true);
+        if (!is_array($data)) {
+            throw new \Exception('Could not parse card info from image');
+        }
+
+        return $data;
+    }
 }

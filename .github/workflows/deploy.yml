@@ -2,8 +2,13 @@ name: Deploy Backend
 
 on:
   push:
-    branches: [main]
+    branches: [main, test]
   workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to deploy (main or test)"
+        required: false
+        default: ""
 
 jobs:
   deploy:
@@ -13,6 +18,28 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Resolve environment config
+        id: env
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          if [ "$BRANCH" = "main" ]; then
+            echo "app_url=https://api.biz-connect.online"         >> $GITHUB_OUTPUT
+            echo "frontend_url=https://biz-connect.online"        >> $GITHUB_OUTPUT
+            echo "deploy_path=/home/u564264509/domains/biz-connect.online/public_html/api" >> $GITHUB_OUTPUT
+            echo "swagger_host=https://api.biz-connect.online"    >> $GITHUB_OUTPUT
+            echo "app_debug=false"                                 >> $GITHUB_OUTPUT
+            echo "log_level=error"                                 >> $GITHUB_OUTPUT
+            echo "label=Production"                                >> $GITHUB_OUTPUT
+          else
+            echo "app_url=https://test-api.biz-connect.online"      >> $GITHUB_OUTPUT
+            echo "frontend_url=https://test.biz-connect.online"     >> $GITHUB_OUTPUT
+            echo "deploy_path=/home/u564264509/domains/biz-connect.online/public_html/test-api" >> $GITHUB_OUTPUT
+            echo "swagger_host=https://test-api.biz-connect.online" >> $GITHUB_OUTPUT
+            echo "app_debug=true"                                    >> $GITHUB_OUTPUT
+            echo "log_level=debug"                                   >> $GITHUB_OUTPUT
+            echo "label=Test"                                        >> $GITHUB_OUTPUT
+          fi
+
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
@@ -20,7 +47,7 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           echo "StrictHostKeyChecking no" >> ~/.ssh/config
 
-      - name: Create .env for production
+      - name: Create .env
         env:
           APP_KEY: ${{ secrets.APP_KEY }}
           DB_DATABASE: ${{ secrets.DB_DATABASE }}
@@ -29,19 +56,20 @@ jobs:
           MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
           MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
         run: |
           {
             echo "APP_NAME=BizConnect"
             echo "APP_ENV=production"
             printf "APP_KEY=%s\n" "$APP_KEY"
-            echo "APP_DEBUG=false"
-            echo "APP_URL=https://biz-connect.online"
-            echo "FRONTEND_URL=https://biz-connect.online"
+            echo "APP_DEBUG=${{ steps.env.outputs.app_debug }}"
+            echo "APP_URL=${{ steps.env.outputs.app_url }}"
+            echo "FRONTEND_URL=${{ steps.env.outputs.frontend_url }}"
             echo "APP_LOCALE=en"
             echo "APP_FALLBACK_LOCALE=en"
             echo ""
             echo "LOG_CHANNEL=stack"
-            echo "LOG_LEVEL=error"
+            echo "LOG_LEVEL=${{ steps.env.outputs.log_level }}"
             echo ""
             echo "DB_CONNECTION=mysql"
             echo "DB_HOST=localhost"
@@ -64,11 +92,13 @@ jobs:
             printf "MAIL_FROM_ADDRESS=%s\n" "$MAIL_USERNAME"
             printf "MAIL_FROM_NAME=%s\n" '"Biz Connect"'
             echo ""
-            echo "L5_SWAGGER_CONST_HOST=https://biz-connect.online/backend/public"
+            echo "L5_SWAGGER_CONST_HOST=${{ steps.env.outputs.swagger_host }}"
             echo "L5_SWAGGER_GENERATE_ALWAYS=true"
             echo "L5_SWAGGER_USE_ABSOLUTE_PATH=false"
             echo ""
             printf "GEMINI_API_KEY=%s\n" "$GEMINI_API_KEY"
+            echo ""
+            printf "CLOUDINARY_URL=%s\n" "$CLOUDINARY_URL"
           } > .env.production
 
       - name: Deploy files via rsync
@@ -82,28 +112,40 @@ jobs:
               --exclude='.env' \
               --exclude='.env.production' \
               --exclude='storage/*.key' \
-              ./ ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:/home/u564264509/domains/biz-connect.online/public_html/backend/ && break
+              ./ ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:${{ steps.env.outputs.deploy_path }}/ && break
             echo "Attempt $i failed, retrying in 10s..."
             sleep 10
           done
 
-      - name: Upload .env to server
+      - name: Upload .env
         run: |
           scp -P ${{ secrets.SSH_PORT }} -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
             .env.production \
-            ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:/home/u564264509/domains/biz-connect.online/public_html/backend/.env
+            ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:${{ steps.env.outputs.deploy_path }}/.env
 
-      - name: Setup Backend Environment
+      - name: Setup server
+        env:
+          DEPLOY_PATH: ${{ steps.env.outputs.deploy_path }}
+          LABEL: ${{ steps.env.outputs.label }}
         run: |
           ssh -p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
-            ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} bash -s << 'SCRIPT'
+            ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} bash -s << SCRIPT
             set -e
-            cd /home/u564264509/domains/biz-connect.online/public_html/backend
-
-            echo "===== PHP Version ====="
-            php -v
-
+            cd "$DEPLOY_PATH"
             chmod 644 .env
+
+            # Root .htaccess forwards all requests into Laravel's public/
+            cat > .htaccess << 'HTEOF'
+            <IfModule mod_rewrite.c>
+                RewriteEngine On
+
+                RewriteCond %{HTTPS} off
+                RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+                RewriteCond %{REQUEST_URI} !^/public/
+                RewriteRule ^(.*)$ public/\$1 [L]
+            </IfModule>
+            HTEOF
 
             echo "===== Installing Composer dependencies ====="
             if command -v composer &> /dev/null; then
@@ -112,27 +154,27 @@ jobs:
               php /usr/local/bin/composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
             fi
 
-            echo "===== Setting permissions ====="
+            echo "===== Permissions ====="
             chmod -R 775 storage bootstrap/cache
             find storage -type f -exec chmod 664 {} \;
             find storage -type d -exec chmod 775 {} \;
 
-            echo "===== Clearing all caches ====="
+            echo "===== Clearing caches ====="
             php artisan config:clear
             php artisan cache:clear
             php artisan route:clear
             php artisan view:clear
 
-            echo "===== Running migrations ====="
+            echo "===== Migrations ====="
             php artisan migrate --force --verbose
 
-            echo "===== Generating Swagger documentation ====="
+            echo "===== Swagger ====="
             php artisan l5-swagger:generate
 
-            echo "===== Caching config ====="
+            echo "===== Caching ====="
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
 
-            echo "===== Deployment completed successfully! ====="
+            echo "===== [$LABEL] Backend deployed to $DEPLOY_PATH ====="
           SCRIPT

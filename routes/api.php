@@ -130,6 +130,7 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
     Route::post('business-card', [BusinessCardController::class, 'store']);
     Route::delete('business-card', [BusinessCardController::class, 'destroy']);
     Route::post('business-card/connect/{slug}', [BusinessCardController::class, 'connect']);
+    Route::post('business-card/extract', [BusinessCardController::class, 'extractCardInfo']);
 });
 
 // ✅ Handle OPTIONS preflight

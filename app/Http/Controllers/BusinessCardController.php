@@ -8,6 +8,7 @@ use App\Models\Address;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 
 class BusinessCardController extends Controller
 {
@@ -106,7 +107,10 @@ class BusinessCardController extends Controller
             'linkedin'   => $card->linkedin,
             'facebook'   => $card->facebook,
             'twitter'    => $card->twitter,
-            'avatar'     => $card->avatar,
+            'avatar'           => $card->avatar,
+            'card_image_front' => $card->card_image_front,
+            'card_image_back'  => $card->card_image_back,
+            'background_image' => $card->background_image,
             'company'    => $card->company ? [
                 'name'    => $card->company->name,
                 'website' => $card->company->website,
@@ -256,14 +260,36 @@ class BusinessCardController extends Controller
             'linkedin'       => 'nullable|url|max:255',
             'facebook'       => 'nullable|url|max:255',
             'twitter'        => 'nullable|url|max:255',
-            'avatar'         => 'nullable|image|max:2048',
-            'notes'          => 'nullable|string',
-            'is_public'      => 'nullable|boolean',
+            'avatar'            => 'nullable|image|max:5120',
+            'card_image_front'  => 'nullable|image|max:10240',
+            'card_image_back'   => 'nullable|image|max:10240',
+            'background_image'  => 'nullable|image|max:10240',
+            'clear_card_images' => 'nullable|boolean',
+            'clear_background'  => 'nullable|boolean',
+            'notes'             => 'nullable|string',
+            'is_public'         => 'nullable|boolean',
         ]);
 
-        if ($request->hasFile('avatar')) {
-            $data['avatar'] = $request->file('avatar')->store('avatars', 'public');
+        // Upload images to Cloudinary
+        foreach (['avatar', 'card_image_front', 'card_image_back', 'background_image'] as $field) {
+            if ($request->hasFile($field)) {
+                $result = Cloudinary::uploadApi()->upload(
+                    $request->file($field)->getRealPath(),
+                    ['folder' => 'bizz-connect/business-cards']
+                );
+                $data[$field] = $result['secure_url'];
+            }
         }
+
+        // Clear old images when switching mode
+        if ($request->boolean('clear_card_images')) {
+            $data['card_image_front'] = null;
+            $data['card_image_back']  = null;
+        }
+        if ($request->boolean('clear_background')) {
+            $data['background_image'] = null;
+        }
+
         $data['user_id'] = $request->user()->id;
 
         DB::beginTransaction();
@@ -300,8 +326,14 @@ class BusinessCardController extends Controller
             }
 
             if ($card) {
-                if ($request->hasFile('avatar') && $card->avatar) {
-                    Storage::disk('public')->delete($card->avatar);
+                // Delete old Cloudinary images when replaced
+                foreach (['avatar', 'card_image_front', 'card_image_back', 'background_image'] as $field) {
+                    if ($request->hasFile($field) && $card->$field) {
+                        $publicId = $this->extractCloudinaryPublicId($card->$field);
+                        if ($publicId) {
+                            Cloudinary::uploadApi()->destroy($publicId);
+                        }
+                    }
                 }
                 $card->update($data);
             } else {
@@ -335,11 +367,83 @@ class BusinessCardController extends Controller
             return response()->json(['message' => 'No business card found'], 404);
         }
 
-        if ($card->avatar) {
-            Storage::disk('public')->delete($card->avatar);
+        foreach (['avatar', 'card_image_front', 'card_image_back', 'background_image'] as $field) {
+            if ($card->$field) {
+                $publicId = $this->extractCloudinaryPublicId($card->$field);
+                if ($publicId) {
+                    Cloudinary::uploadApi()->destroy($publicId);
+                }
+            }
         }
 
         $card->delete();
         return response()->json(['message' => 'Business card deleted']);
+    }
+
+    public function extractCardInfo(Request $request)
+    {
+        $request->validate(['text' => 'required|string|max:5000']);
+
+        $text = $request->input('text');
+        $lines = array_values(array_filter(array_map('trim', preg_split('/\r?\n/', $text))));
+
+        // Email
+        preg_match('/[\w.+\-]+@[\w\-]+\.[a-z]{2,}/i', $text, $emailMatch);
+
+        // Phone / Mobile — grab up to 2 phone numbers
+        preg_match_all('/(?:\+?\d[\d\s\-().]{6,}\d)/', $text, $phoneMatches);
+        $phones = array_values(array_unique(array_map(fn($p) => preg_replace('/\s+/', '', $p), $phoneMatches[0] ?? [])));
+
+        // Website
+        preg_match('/https?:\/\/[\w.\-\/]+|www\.[\w.\-\/]+/i', $text, $webMatch);
+
+        // LinkedIn
+        preg_match('/linkedin\.com\/in\/[\w\-]+/i', $text, $liMatch);
+
+        // Full name heuristic: first non-empty line that is NOT email/phone/url
+        // and looks like a name (2+ words, mostly alpha)
+        $fullName = null;
+        $jobTitle = null;
+        $nameFound = false;
+        foreach ($lines as $line) {
+            if (empty($line)) continue;
+            // Skip lines that are clearly contact info
+            if (preg_match('/[@\d\/]/', $line) || strlen($line) > 60) continue;
+            $wordCount = str_word_count($line);
+            if (!$nameFound && $wordCount >= 1 && $wordCount <= 5 && preg_match('/^[a-zA-ZÀ-ÿ\s.\'-]+$/u', $line)) {
+                $fullName = $line;
+                $nameFound = true;
+                continue;
+            }
+            if ($nameFound && $jobTitle === null && $wordCount >= 1 && $wordCount <= 8 && preg_match('/^[a-zA-ZÀ-ÿ\s.\',&\-]+$/u', $line)) {
+                $jobTitle = $line;
+                break;
+            }
+        }
+
+        return response()->json([
+            'full_name'      => $fullName,
+            'job_title'      => $jobTitle,
+            'email'          => $emailMatch[0] ?? null,
+            'phone'          => $phones[0] ?? null,
+            'mobile'         => $phones[1] ?? null,
+            'website'        => !empty($webMatch[0]) ? (str_starts_with($webMatch[0], 'http') ? $webMatch[0] : 'https://' . $webMatch[0]) : null,
+            'linkedin'       => !empty($liMatch[0]) ? 'https://' . $liMatch[0] : null,
+            'department'     => null,
+            'company'        => null,
+            'address_detail' => null,
+        ]);
+    }
+
+    private function extractCloudinaryPublicId(string $url): ?string
+    {
+        // Extract public_id from Cloudinary URL
+        // e.g. https://res.cloudinary.com/cloud/image/upload/v123/bizz-connect/business-cards/abc.jpg
+        //   -> bizz-connect/business-cards/abc
+        if (!str_contains($url, 'cloudinary.com')) return null;
+        if (preg_match('/\/upload\/(?:v\d+\/)?(.+)\.[a-z]+$/i', $url, $m)) {
+            return $m[1];
+        }
+        return null;
     }
 }
