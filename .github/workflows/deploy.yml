@@ -134,18 +134,16 @@ jobs:
             cd "$DEPLOY_PATH"
             chmod 644 .env
 
-            # Root .htaccess forwards all requests into Laravel's public/
-            cat > .htaccess << 'HTEOF'
-            <IfModule mod_rewrite.c>
-                RewriteEngine On
-
-                RewriteCond %{HTTPS} off
-                RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
-
-                RewriteCond %{REQUEST_URI} !^/public/
-                RewriteRule ^(.*)$ public/\$1 [L]
-            </IfModule>
-            HTEOF
+            echo "===== Writing root .htaccess ====="
+            printf '%s\n' \
+              '<IfModule mod_rewrite.c>' \
+              '    RewriteEngine On' \
+              '    RewriteCond %{HTTPS} off' \
+              '    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]' \
+              '    RewriteCond %{REQUEST_URI} !^/public/' \
+              '    RewriteRule ^(.*)$ /public/$1 [L,QSA]' \
+              '</IfModule>' \
+              > "$DEPLOY_PATH/.htaccess"
 
             echo "===== Installing Composer dependencies ====="
             if command -v composer &> /dev/null; then
