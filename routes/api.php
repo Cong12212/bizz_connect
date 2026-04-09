@@ -13,6 +13,7 @@ use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\BusinessCardController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\AiGuideController;
+use App\Http\Controllers\ContactImageController;
 
 /**
  * AUTH (public)
@@ -87,6 +88,11 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
     Route::post('/contacts/{contact}/tags', [ContactController::class, 'attachTags'])->whereNumber('contact');
     Route::delete('/contacts/{contact}/tags/{tag}', [ContactController::class, 'detachTag'])
         ->whereNumber('contact')->whereNumber('tag');
+
+    Route::post('/contacts/{contact}/avatar', [ContactImageController::class, 'uploadAvatar'])->whereNumber('contact');
+    Route::delete('/contacts/{contact}/avatar', [ContactImageController::class, 'deleteAvatar'])->whereNumber('contact');
+    Route::post('/contacts/{contact}/card-image', [ContactImageController::class, 'uploadCardImage'])->whereNumber('contact');
+    Route::delete('/contacts/{contact}/card-image/{side}', [ContactImageController::class, 'deleteCardImage'])->whereNumber('contact');
 
     Route::get('/tags', [TagController::class, 'index']);
     Route::post('/tags', [TagController::class, 'store']);

@@ -3,21 +3,30 @@
 namespace App\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 class ContactResource extends JsonResource
 {
     public function toArray($request)
     {
         return [
-            'id'      => $this->id,
-            'name'    => $this->name,
-            'company' => $this->company,
-            'email'   => $this->email,
-            'phone'   => $this->phone,
-            'address' => $this->address,
-            'notes'   => $this->notes,
-            'created_at' => $this->created_at,
-            'updated_at' => $this->updated_at,
+            'id'        => $this->id,
+            'name'      => $this->name,
+            'company'   => $this->company,
+            'job_title' => $this->job_title,
+            'email'     => $this->email,
+            'phone'     => $this->phone,
+            'address'   => $this->address,
+            'notes'     => $this->notes,
+            'linkedin_url' => $this->linkedin_url,
+            'website_url'  => $this->website_url,
+            'source'       => $this->source,
+            'created_at'   => $this->created_at,
+            'updated_at'   => $this->updated_at,
+
+            'avatar'           => $this->avatar ? Storage::disk('public')->url($this->avatar) : null,
+            'card_image_front' => $this->card_image_front ? Storage::disk('public')->url($this->card_image_front) : null,
+            'card_image_back'  => $this->card_image_back  ? Storage::disk('public')->url($this->card_image_back)  : null,
 
             'tags' => TagResource::collection($this->whenLoaded('tags')),
         ];

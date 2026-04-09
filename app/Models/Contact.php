@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 
 class Contact extends Model
@@ -29,13 +30,33 @@ class Contact extends Model
         'duplicate_of_id',
         'search_text',
         'source',
+        'avatar',
+        'card_image_front',
+        'card_image_back',
     ];
+
+    protected $appends = ['avatar_url', 'card_front_url', 'card_back_url'];
 
     protected $casts = [
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
     ];
+
+    public function getAvatarUrlAttribute(): ?string
+    {
+        return $this->avatar ? Storage::disk('public')->url($this->avatar) : null;
+    }
+
+    public function getCardFrontUrlAttribute(): ?string
+    {
+        return $this->card_image_front ? Storage::disk('public')->url($this->card_image_front) : null;
+    }
+
+    public function getCardBackUrlAttribute(): ?string
+    {
+        return $this->card_image_back ? Storage::disk('public')->url($this->card_image_back) : null;
+    }
 
     /** Owner of the contact */
     public function owner(): BelongsTo
