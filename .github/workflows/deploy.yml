@@ -2,11 +2,11 @@ name: Deploy Backend
 
 on:
   push:
-    branches: [main, test]
+    branches: [master, test]
   workflow_dispatch:
     inputs:
       branch:
-        description: "Branch to deploy (main or test)"
+        description: "Branch to deploy (master or test)"
         required: false
         default: ""
 
@@ -22,7 +22,7 @@ jobs:
         id: env
         run: |
           BRANCH="${{ github.ref_name }}"
-          if [ "$BRANCH" = "main" ]; then
+          if [ "$BRANCH" = "master" ]; then
             echo "app_url=https://api.biz-connect.online"         >> $GITHUB_OUTPUT
             echo "frontend_url=https://biz-connect.online"        >> $GITHUB_OUTPUT
             echo "deploy_path=/home/u564264509/domains/biz-connect.online/public_html/api" >> $GITHUB_OUTPUT
