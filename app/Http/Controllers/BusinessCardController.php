@@ -8,7 +8,6 @@ use App\Models\Address;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 
 class BusinessCardController extends Controller
 {
@@ -116,7 +115,12 @@ class BusinessCardController extends Controller
                 'website' => $card->company->website,
                 'logo'    => $card->company->logo,
             ] : null,
-            'address'    => $card->address?->only(['id', 'address_detail', 'city_id', 'state_id', 'country_id']),
+            'address'    => $card->address ? [
+                'address_detail' => $card->address->address_detail,
+                'country' => $card->address->country ? ['code' => $card->address->country->code] : null,
+                'state'   => $card->address->state   ? ['code' => $card->address->state->code]   : null,
+                'city'    => $card->address->city    ? ['code' => $card->address->city->code]    : null,
+            ] : null,
             'view_count' => $card->view_count,
         ]);
     }
@@ -270,23 +274,34 @@ class BusinessCardController extends Controller
             'is_public'         => 'nullable|boolean',
         ]);
 
-        // Upload images to Cloudinary
-        foreach (['avatar', 'card_image_front', 'card_image_back', 'background_image'] as $field) {
+        // Upload images to local storage
+        $userId = $request->user()->id;
+        $imageMeta = [
+            'avatar'           => ['path' => "business-cards/{$userId}/avatar.jpg",     'maxW' => 400,  'q' => 75],
+            'card_image_front' => ['path' => "business-cards/{$userId}/card_front.jpg", 'maxW' => 1200, 'q' => 80],
+            'card_image_back'  => ['path' => "business-cards/{$userId}/card_back.jpg",  'maxW' => 1200, 'q' => 80],
+            'background_image' => ['path' => "business-cards/{$userId}/background.jpg", 'maxW' => 1920, 'q' => 85],
+        ];
+        foreach ($imageMeta as $field => $meta) {
             if ($request->hasFile($field)) {
-                $result = Cloudinary::uploadApi()->upload(
-                    $request->file($field)->getRealPath(),
-                    ['folder' => 'bizz-connect/business-cards']
-                );
-                $data[$field] = $result['secure_url'];
+                $this->resizeAndStore($request->file($field), $meta['path'], $meta['maxW'], $meta['q']);
+                $data[$field] = $meta['path'];
             }
         }
 
         // Clear old images when switching mode
+        $existingCard = $request->user()->businessCard;
         if ($request->boolean('clear_card_images')) {
+            foreach (['card_image_front', 'card_image_back'] as $field) {
+                $raw = $existingCard?->getAttributes()[$field] ?? null;
+                if ($raw && !str_starts_with($raw, 'http')) Storage::disk('public')->delete($raw);
+            }
             $data['card_image_front'] = null;
             $data['card_image_back']  = null;
         }
         if ($request->boolean('clear_background')) {
+            $raw = $existingCard?->getAttributes()['background_image'] ?? null;
+            if ($raw && !str_starts_with($raw, 'http')) Storage::disk('public')->delete($raw);
             $data['background_image'] = null;
         }
 
@@ -326,15 +341,6 @@ class BusinessCardController extends Controller
             }
 
             if ($card) {
-                // Delete old Cloudinary images when replaced
-                foreach (['avatar', 'card_image_front', 'card_image_back', 'background_image'] as $field) {
-                    if ($request->hasFile($field) && $card->$field) {
-                        $publicId = $this->extractCloudinaryPublicId($card->$field);
-                        if ($publicId) {
-                            Cloudinary::uploadApi()->destroy($publicId);
-                        }
-                    }
-                }
                 $card->update($data);
             } else {
                 $card = BusinessCard::create($data);
@@ -368,11 +374,9 @@ class BusinessCardController extends Controller
         }
 
         foreach (['avatar', 'card_image_front', 'card_image_back', 'background_image'] as $field) {
-            if ($card->$field) {
-                $publicId = $this->extractCloudinaryPublicId($card->$field);
-                if ($publicId) {
-                    Cloudinary::uploadApi()->destroy($publicId);
-                }
+            $raw = $card->getAttributes()[$field] ?? null;
+            if ($raw && !str_starts_with($raw, 'http')) {
+                Storage::disk('public')->delete($raw);
             }
         }
 
@@ -435,15 +439,33 @@ class BusinessCardController extends Controller
         ]);
     }
 
-    private function extractCloudinaryPublicId(string $url): ?string
+    private function resizeAndStore(\Illuminate\Http\UploadedFile $file, string $storagePath, int $maxWidth, int $quality): void
     {
-        // Extract public_id from Cloudinary URL
-        // e.g. https://res.cloudinary.com/cloud/image/upload/v123/bizz-connect/business-cards/abc.jpg
-        //   -> bizz-connect/business-cards/abc
-        if (!str_contains($url, 'cloudinary.com')) return null;
-        if (preg_match('/\/upload\/(?:v\d+\/)?(.+)\.[a-z]+$/i', $url, $m)) {
-            return $m[1];
+        [$origW, $origH] = getimagesize($file->getRealPath());
+
+        if ($origW > $maxWidth) {
+            $newW = $maxWidth;
+            $newH = (int) round($origH * ($maxWidth / $origW));
+        } else {
+            $newW = $origW;
+            $newH = $origH;
         }
-        return null;
+
+        $mime = $file->getMimeType();
+        $src  = match (true) {
+            str_contains($mime, 'png')  => imagecreatefrompng($file->getRealPath()),
+            str_contains($mime, 'webp') => imagecreatefromwebp($file->getRealPath()),
+            str_contains($mime, 'gif')  => imagecreatefromgif($file->getRealPath()),
+            default                      => imagecreatefromjpeg($file->getRealPath()),
+        };
+
+        $dst = imagecreatetruecolor($newW, $newH);
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
+
+        ob_start();
+        imagejpeg($dst, null, $quality);
+        $jpeg = ob_get_clean();
+
+        Storage::disk('public')->put($storagePath, $jpeg);
     }
 }

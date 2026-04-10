@@ -18,6 +18,15 @@ use App\Http\Controllers\ContactImageController;
 /**
  * AUTH (public)
  */
+// ── Storage image proxy (adds CORS headers for canvas toDataURL) ──────────────
+Route::get('img/{path}', function (string $path) {
+    $file = storage_path('app/public/' . $path);
+    abort_if(!file_exists($file), 404);
+    return response()->file($file, [
+        'Cache-Control' => 'public, max-age=86400',
+    ]);
+})->where('path', '.*');
+
 Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
     Route::post('login',    [AuthController::class, 'login']);
@@ -93,6 +102,7 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
     Route::delete('/contacts/{contact}/avatar', [ContactImageController::class, 'deleteAvatar'])->whereNumber('contact');
     Route::post('/contacts/{contact}/card-image', [ContactImageController::class, 'uploadCardImage'])->whereNumber('contact');
     Route::delete('/contacts/{contact}/card-image/{side}', [ContactImageController::class, 'deleteCardImage'])->whereNumber('contact');
+    Route::post('/contacts/{contact}/card-image/copy-url', [ContactImageController::class, 'copyFromUrl'])->whereNumber('contact');
 
     Route::get('/tags', [TagController::class, 'index']);
     Route::post('/tags', [TagController::class, 'store']);

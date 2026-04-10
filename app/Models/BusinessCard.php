@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * @OA\Schema(
@@ -71,6 +72,21 @@ class BusinessCard extends Model
         'is_public'  => 'boolean',
         'view_count' => 'integer',
     ];
+
+    // ── URL accessors ─────────────────────────────────────────────────────────
+
+    private function storageUrl(?string $path): ?string
+    {
+        if (!$path) return null;
+        if (str_starts_with($path, 'http')) return $path; // backward compat: old Cloudinary URLs
+        // Use /api/img/ proxy so CORS headers are added (static files bypass Laravel middleware)
+        return rtrim(config('app.url'), '/') . '/api/img/' . ltrim($path, '/');
+    }
+
+    public function getAvatarAttribute($value): ?string          { return $this->storageUrl($value); }
+    public function getCardImageFrontAttribute($value): ?string  { return $this->storageUrl($value); }
+    public function getCardImageBackAttribute($value): ?string   { return $this->storageUrl($value); }
+    public function getBackgroundImageAttribute($value): ?string { return $this->storageUrl($value); }
 
     protected static function boot()
     {

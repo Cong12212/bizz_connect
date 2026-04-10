@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'paths' => ['api/*', 'auth/*', 'login', 'logout', 'user', 'sanctum/csrf-cookie'],
+    'paths' => ['api/*', 'auth/*', 'login', 'logout', 'user', 'sanctum/csrf-cookie', 'storage/*'],
     'allowed_methods' => ['*'],
 
     // ✅ Cho phép tất cả localhost bằng pattern

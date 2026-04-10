@@ -82,6 +82,56 @@ class ContactImageController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    // ── Copy card image from URL ──────────────────────────────────────────────
+
+    public function copyFromUrl(Request $request, Contact $contact)
+    {
+        abort_if($contact->owner_user_id !== $request->user()->id, 403);
+
+        $request->validate([
+            'side' => 'required|in:front,back',
+            'url'  => 'required|url',
+        ]);
+
+        $side = $request->input('side');
+        $col  = $side === 'front' ? 'card_image_front' : 'card_image_back';
+        $path = "contacts/{$contact->id}/card_{$side}.jpg";
+
+        $imageData = @file_get_contents($request->input('url'));
+        abort_if($imageData === false, 422, 'Failed to fetch image from URL');
+
+        $src = @imagecreatefromstring($imageData);
+        abort_if($src === false, 422, 'Invalid image format');
+
+        $origW   = imagesx($src);
+        $origH   = imagesy($src);
+        $maxWidth = 1200;
+
+        if ($origW > $maxWidth) {
+            $newW = $maxWidth;
+            $newH = (int) round($origH * ($maxWidth / $origW));
+        } else {
+            $newW = $origW;
+            $newH = $origH;
+        }
+
+        $dst = imagecreatetruecolor($newW, $newH);
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
+
+        ob_start();
+        imagejpeg($dst, null, 80);
+        $jpeg = ob_get_clean();
+
+        if ($contact->$col && $contact->$col !== $path) {
+            Storage::disk('public')->delete($contact->$col);
+        }
+
+        Storage::disk('public')->put($path, $jpeg);
+        $contact->update([$col => $path]);
+
+        return response()->json(['card_url' => asset('storage/' . $path)]);
+    }
+
     // ── Helper ────────────────────────────────────────────────────────────────
 
     private function resizeAndStore(\Illuminate\Http\UploadedFile $file, string $storagePath, int $maxWidth, int $quality): void
