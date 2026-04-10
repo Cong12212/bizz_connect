@@ -26,7 +26,7 @@ class ContactImageController extends Controller
 
         $contact->update(['avatar' => $path]);
 
-        return response()->json(['avatar_url' => asset('storage/' . $path)]);
+        return response()->json(['avatar_url' => url('api/img/' . $path)]);
     }
 
     public function deleteAvatar(Request $request, Contact $contact)
@@ -64,7 +64,7 @@ class ContactImageController extends Controller
 
         $contact->update([$col => $path]);
 
-        return response()->json(['card_url' => asset('storage/' . $path)]);
+        return response()->json(['card_url' => url('api/img/' . $path)]);
     }
 
     public function deleteCardImage(Request $request, Contact $contact, string $side)
@@ -129,7 +129,7 @@ class ContactImageController extends Controller
         Storage::disk('public')->put($path, $jpeg);
         $contact->update([$col => $path]);
 
-        return response()->json(['card_url' => asset('storage/' . $path)]);
+        return response()->json(['card_url' => url('api/img/' . $path)]);
     }
 
     // ── Helper ────────────────────────────────────────────────────────────────

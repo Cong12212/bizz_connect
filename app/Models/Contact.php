@@ -43,20 +43,16 @@ class Contact extends Model
         'deleted_at' => 'datetime',
     ];
 
-    public function getAvatarUrlAttribute(): ?string
+    private function imgUrl(?string $path): ?string
     {
-        return $this->avatar ? Storage::disk('public')->url($this->avatar) : null;
+        if (!$path) return null;
+        if (str_starts_with($path, 'http')) return $path;
+        return rtrim(config('app.url'), '/') . '/api/img/' . ltrim($path, '/');
     }
 
-    public function getCardFrontUrlAttribute(): ?string
-    {
-        return $this->card_image_front ? Storage::disk('public')->url($this->card_image_front) : null;
-    }
-
-    public function getCardBackUrlAttribute(): ?string
-    {
-        return $this->card_image_back ? Storage::disk('public')->url($this->card_image_back) : null;
-    }
+    public function getAvatarUrlAttribute(): ?string    { return $this->imgUrl($this->avatar); }
+    public function getCardFrontUrlAttribute(): ?string { return $this->imgUrl($this->card_image_front); }
+    public function getCardBackUrlAttribute(): ?string  { return $this->imgUrl($this->card_image_back); }
 
     /** Owner of the contact */
     public function owner(): BelongsTo
