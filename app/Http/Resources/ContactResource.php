@@ -24,9 +24,12 @@ class ContactResource extends JsonResource
             'created_at'   => $this->created_at,
             'updated_at'   => $this->updated_at,
 
-            'avatar'           => $this->avatar ? Storage::disk('public')->url($this->avatar) : null,
-            'card_image_front' => $this->card_image_front ? Storage::disk('public')->url($this->card_image_front) : null,
-            'card_image_back'  => $this->card_image_back  ? Storage::disk('public')->url($this->card_image_back)  : null,
+            'avatar'           => $this->avatar_url,
+            'avatar_url'       => $this->avatar_url,
+            'card_image_front' => $this->card_front_url,
+            'card_image_back'  => $this->card_back_url,
+            'card_front_url'   => $this->card_front_url,
+            'card_back_url'    => $this->card_back_url,
 
             'tags' => TagResource::collection($this->whenLoaded('tags')),
         ];
