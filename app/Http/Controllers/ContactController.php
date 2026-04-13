@@ -61,24 +61,13 @@ class ContactController extends Controller
         $textTerm     = $this->stripHashtags($rawQ);
 
         if ($textTerm !== '') {
-            if (mb_strlen($textTerm) >= 3) {
-                // Use the existing FULLTEXT index on (name, company, email, phone).
-                // Strip FULLTEXT operator chars to avoid syntax errors.
-                $fts = preg_replace('/[+\-><()~*"@]/', '', $textTerm);
-                $q->whereRaw(
-                    'MATCH(name, company, email, phone) AGAINST(? IN BOOLEAN MODE)',
-                    [$fts . '*']
-                );
-            } else {
-                // Short terms: prefix LIKE on indexed columns (no leading %).
-                $prefix = $textTerm . '%';
-                $q->where(function ($w) use ($prefix, $textTerm) {
-                    $w->where('name', 'like', $prefix)
-                        ->orWhere('email', 'like', $prefix)
-                        ->orWhere('phone', 'like', '%' . $textTerm . '%') // phones may have country code prefix
-                        ->orWhere('company', 'like', $prefix);
-                });
-            }
+            $like = '%' . $textTerm . '%';
+            $q->where(function ($w) use ($like) {
+                $w->where('name', 'like', $like)
+                    ->orWhere('email', 'like', $like)
+                    ->orWhere('phone', 'like', $like)
+                    ->orWhere('company', 'like', $like);
+            });
         }
 
         // ===== tag_ids / tags + mode =====
@@ -94,22 +83,12 @@ class ContactController extends Controller
             $tagNames = array_values(array_filter(array_map(fn($s) => ltrim(trim($s), '#'), $tagNames)));
         }
 
-        if (!empty($hashTagNames)) {
-            $tagNames = array_values(array_unique(array_merge($tagNames, $hashTagNames)));
-        }
-
+        // ===== tag filter from UI (exact match) =====
         if (!empty($tagIds) || !empty($tagNames)) {
-            // THAY ĐỔI: Tự động chuyển sang 'all' nếu có nhiều hashtag từ query string
-            $mode = $r->query('tag_mode');
-            if (!$mode && count($hashTagNames) > 1) {
-                $mode = 'all'; // Auto AND mode khi search nhiều #tags
-            }
-            $mode = $mode ?: 'any';
+            $mode = $r->query('tag_mode', 'any');
 
             if (!empty($tagIds)) {
                 if ($mode === 'all') {
-                    // Single subquery with HAVING COUNT instead of N correlated EXISTS.
-                    // Uses the (tag_id, contact_id) covering index on contact_tag.
                     $q->whereIn('contacts.id', function ($sub) use ($tagIds) {
                         $sub->select('contact_id')
                             ->from('contact_tag')
@@ -123,7 +102,6 @@ class ContactController extends Controller
             }
             if (!empty($tagNames)) {
                 if ($mode === 'all') {
-                    // Resolve exact names to IDs first (1 query), then reuse subquery pattern.
                     $resolvedIds = Tag::where('owner_user_id', $r->user()->id)
                         ->whereIn('name', $tagNames)
                         ->pluck('id')
@@ -143,6 +121,14 @@ class ContactController extends Controller
                         $t->whereIn('tags.name', $tagNames);
                     });
                 }
+            }
+        }
+
+        // ===== hashtag from search box (#xxx) — partial LIKE, AND mode =====
+        if (!empty($hashTagNames)) {
+            foreach ($hashTagNames as $ht) {
+                $like = '%' . $ht . '%';
+                $q->whereHas('tags', fn($t) => $t->where('tags.name', 'like', $like));
             }
         }
 
