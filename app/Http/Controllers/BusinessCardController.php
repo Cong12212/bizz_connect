@@ -269,6 +269,8 @@ class BusinessCardController extends Controller
             'card_image_back'   => 'nullable|image|max:10240',
             'background_image'  => 'nullable|image|max:10240',
             'clear_card_images' => 'nullable|boolean',
+            'clear_card_front'  => 'nullable|boolean',
+            'clear_card_back'   => 'nullable|boolean',
             'clear_background'  => 'nullable|boolean',
             'notes'             => 'nullable|string',
             'is_public'         => 'nullable|boolean',
@@ -289,7 +291,7 @@ class BusinessCardController extends Controller
             }
         }
 
-        // Clear old images when switching mode
+        // Clear old images when switching mode or deleting individual images
         $existingCard = $request->user()->businessCard;
         if ($request->boolean('clear_card_images')) {
             foreach (['card_image_front', 'card_image_back'] as $field) {
@@ -298,6 +300,16 @@ class BusinessCardController extends Controller
             }
             $data['card_image_front'] = null;
             $data['card_image_back']  = null;
+        }
+        if ($request->boolean('clear_card_front') && !$request->hasFile('card_image_front')) {
+            $raw = $existingCard?->getAttributes()['card_image_front'] ?? null;
+            if ($raw && !str_starts_with($raw, 'http')) Storage::disk('public')->delete($raw);
+            $data['card_image_front'] = null;
+        }
+        if ($request->boolean('clear_card_back') && !$request->hasFile('card_image_back')) {
+            $raw = $existingCard?->getAttributes()['card_image_back'] ?? null;
+            if ($raw && !str_starts_with($raw, 'http')) Storage::disk('public')->delete($raw);
+            $data['card_image_back'] = null;
         }
         if ($request->boolean('clear_background')) {
             $raw = $existingCard?->getAttributes()['background_image'] ?? null;
