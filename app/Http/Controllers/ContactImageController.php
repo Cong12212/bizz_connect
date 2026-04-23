@@ -116,11 +116,15 @@ class ContactImageController extends Controller
         }
 
         $dst = imagecreatetruecolor($newW, $newH);
+        // Fill white so PNG transparency becomes white instead of black when saved as JPEG
+        imagefill($dst, 0, 0, imagecolorallocate($dst, 255, 255, 255));
         imagecopyresampled($dst, $src, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
+        imagedestroy($src);
 
         ob_start();
         imagejpeg($dst, null, 80);
         $jpeg = ob_get_clean();
+        imagedestroy($dst);
 
         if ($contact->$col && $contact->$col !== $path) {
             Storage::disk('public')->delete($contact->$col);
@@ -136,7 +140,12 @@ class ContactImageController extends Controller
 
     private function resizeAndStore(\Illuminate\Http\UploadedFile $file, string $storagePath, int $maxWidth, int $quality): void
     {
-        [$origW, $origH] = getimagesize($file->getRealPath());
+        // imagecreatefromstring handles JPEG/PNG/GIF/WebP/BMP without needing MIME detection
+        $src = @imagecreatefromstring(file_get_contents($file->getRealPath()));
+        abort_if($src === false, 422, 'Cannot decode image');
+
+        $origW = imagesx($src);
+        $origH = imagesy($src);
 
         if ($origW > $maxWidth) {
             $newW = $maxWidth;
@@ -146,22 +155,20 @@ class ContactImageController extends Controller
             $newH = $origH;
         }
 
-        $mime = $file->getMimeType();
-        $src  = match (true) {
-            str_contains($mime, 'png')  => imagecreatefrompng($file->getRealPath()),
-            str_contains($mime, 'webp') => imagecreatefromwebp($file->getRealPath()),
-            str_contains($mime, 'gif')  => imagecreatefromgif($file->getRealPath()),
-            default                      => imagecreatefromjpeg($file->getRealPath()),
-        };
-
         $dst = imagecreatetruecolor($newW, $newH);
+        // White background so PNG transparency → white (not black) when saved as JPEG
+        imagefill($dst, 0, 0, imagecolorallocate($dst, 255, 255, 255));
         imagecopyresampled($dst, $src, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
+        imagedestroy($src);
 
-        // Capture output vào buffer → dùng Storage::put để tránh path issue trên Windows
-        ob_start();
-        imagejpeg($dst, null, $quality);
-        $jpeg = ob_get_clean();
+        // Use temp file instead of ob_start/ob_get_clean to avoid silent empty-buffer issues
+        $tmp = tempnam(sys_get_temp_dir(), 'bzimg');
+        $ok  = imagejpeg($dst, $tmp, $quality);
+        imagedestroy($dst);
 
-        Storage::disk('public')->put($storagePath, $jpeg);
+        abort_if(!$ok || filesize($tmp) === 0, 422, 'Failed to encode image');
+
+        Storage::disk('public')->put($storagePath, file_get_contents($tmp));
+        @unlink($tmp);
     }
 }

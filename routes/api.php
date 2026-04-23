@@ -23,7 +23,7 @@ Route::get('img/{path}', function (string $path) {
     $file = storage_path('app/public/' . $path);
     abort_if(!file_exists($file), 404);
     return response()->file($file, [
-        'Cache-Control' => 'public, max-age=86400',
+        'Cache-Control' => 'public, max-age=300',
     ]);
 })->where('path', '.*');
 
