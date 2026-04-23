@@ -25,6 +25,7 @@ class ContactImageController extends Controller
         }
 
         $contact->update(['avatar' => $path]);
+        $contact->touch(); // Force updated_at to advance so cache-busting URLs stay fresh
 
         return response()->json(['avatar_url' => url('api/img/' . $path)]);
     }
@@ -63,6 +64,7 @@ class ContactImageController extends Controller
         }
 
         $contact->update([$col => $path]);
+        $contact->touch(); // Force updated_at to advance so cache-busting URLs stay fresh
 
         return response()->json(['card_url' => url('api/img/' . $path)]);
     }
@@ -132,6 +134,7 @@ class ContactImageController extends Controller
 
         Storage::disk('public')->put($path, $jpeg);
         $contact->update([$col => $path]);
+        $contact->touch(); // Force updated_at to advance so cache-busting URLs stay fresh
 
         return response()->json(['card_url' => url('api/img/' . $path)]);
     }
