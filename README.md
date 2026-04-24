@@ -1,801 +1,483 @@
-# Bizz Connect API
+# Bizz Connect — Laravel 11 Backend API
 
-A comprehensive contact and reminder management system built with Laravel 11, featuring business card management, multi-contact reminders, and real-time notifications.
+> RESTful API backend for Bizz Connect, a CRM-style business networking platform. Built solo end-to-end: system design, database schema, business logic, AI integration, and deployment.
 
-## 📋 Table of Contents
+---
 
-- [Features](#features)
+## Table of Contents
+
+- [Project Overview](#project-overview)
 - [Tech Stack](#tech-stack)
-- [Requirements](#requirements)
-- [Installation](#installation)
+- [System Architecture](#system-architecture)
+- [Modules & Features](#modules--features)
+- [My Role](#my-role)
+- [Notable Implementations](#notable-implementations)
 - [API Documentation](#api-documentation)
-- [Key API Endpoints](#key-api-endpoints)
-- [Advanced Features](#advanced-features)
-- [Configuration](#configuration)
-- [Deployment](#deployment)
 - [Database Schema](#database-schema)
-- [Security](#security)
-- [Testing](#testing)
-- [License](#license)
+- [Installation & Setup](#installation--setup)
+- [Deployment](#deployment)
 
-## ✨ Features
+---
 
-- **Contact Management**: Full CRUD operations with advanced filtering and tagging
-- **Smart Reminders**: Multi-contact reminders with status tracking and notifications
-- **Business Cards**: Digital business cards with public sharing capabilities
-- **Tag System**: Flexible tagging with AND/OR search modes and hashtag support
-- **Notifications**: Real-time activity tracking and upcoming reminder alerts
-- **Data Import/Export**: Excel/CSV import and export with customizable templates
-- **Location Management**: Hierarchical location data (Countries → States → Cities)
-- **Company Profiles**: Company information management with address support
+## Project Overview
 
-## 🛠 Tech Stack
+**What it does:**
+Bizz Connect is a bilingual (Vietnamese/English) business contact management and networking platform. Users can manage a personal CRM of contacts, schedule follow-up reminders, create a shareable digital business card, organize contacts with tags, and get AI-powered assistance through a knowledge base backed by Google Gemini 2.0 Flash.
 
-- **Framework**: Laravel 11
-- **Authentication**: Laravel Sanctum (Bearer Token)
-- **Database**: MySQL 8.0+
-- **API Documentation**: L5-Swagger (OpenAPI 3.0)
-- **Excel Processing**: Maatwebsite/Laravel-Excel
-- **Timezone**: Asia/Ho_Chi_Minh (configurable)
+**Target market:**
+Vietnamese professionals, freelancers, entrepreneurs, and SMEs who need a lightweight CRM with digital card exchange and AI assistant capabilities.
 
-## 📦 Requirements
+**Current status:**
+Production-deployed. Backend hosted on Hostinger (MySQL 8 on `153.92.15.63`). Frontend on Render.com (`bizz-connect-web.onrender.com`). Custom domain: `biz-connect.online`. Email via Hostinger SMTP (`no-reply@biz-connect.online`).
+
+---
+
+## Tech Stack
+
+| Layer | Technology | Version / Notes |
+|-------|-----------|----------------|
+| Framework | Laravel | 11.x |
+| Language | PHP | 8.2+ |
+| Authentication | Laravel Sanctum | 4.x — Bearer token |
+| Database | MySQL | 8.0 (remote host `153.92.15.63`) |
+| Queue | Laravel Queue | `database` driver |
+| Cache | Laravel Cache | `database` driver |
+| AI | Google Gemini 2.0 Flash | REST API via HTTP, SSE streaming |
+| Excel / CSV | Maatwebsite/Laravel-Excel | 3.1.60 |
+| API Docs | L5-Swagger / OpenAPI | 9.x — auto-generated at `/api/documentation` |
+| Mail | Hostinger SMTP | SSL port 465, `no-reply@biz-connect.online` |
+| Storage | Local disk | Images proxied through `/api/img/{path}` |
+| Image Processing | PHP GD | Built-in, used for resize + recompress on upload |
+| Scheduling | Laravel Scheduler | Artisan command for upcoming-reminder notifications |
+| CORS | `fruitcake/laravel-cors` | Configured for production domain + all localhost ports |
+
+---
+
+## System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    React Frontend (Vite)                     │
+│              bizz-connect-web.onrender.com                  │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ HTTPS + Bearer Token
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│             Laravel 11 API  (biz-connect.online)            │
+│                                                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
+│  │ Auth Layer   │  │ CRUD APIs    │  │ AI Guide (SSE)   │  │
+│  │ (Sanctum)    │  │ Contacts     │  │ Gemini 2.0 Flash │  │
+│  │ Email Verify │  │ Tags         │  │ Knowledge Base   │  │
+│  │ Pwd Reset    │  │ Reminders    │  │ (app_knowledge)  │  │
+│  └──────────────┘  │ Notifications│  └──────────────────┘  │
+│                    │ Business Card│                         │
+│  ┌──────────────┐  │ Company      │  ┌──────────────────┐  │
+│  │ Image Proxy  │  │ Location     │  │ Import / Export  │  │
+│  │ /api/img/*   │  └──────────────┘  │ Excel / CSV      │  │
+│  │ GD Resize    │                    │ (Maatwebsite)    │  │
+│  └──────────────┘                    └──────────────────┘  │
+│                                                             │
+│  ┌──────────────┐  ┌──────────────┐                        │
+│  │   Scheduler  │  │    Queue     │                        │
+│  │ (Upcoming    │  │ (DB driver)  │                        │
+│  │ Notifications│  │ Queued Mail  │                        │
+│  └──────────────┘  └──────────────┘                        │
+└───────────────────────────────┬─────────────────────────────┘
+                                │
+                    ┌───────────▼──────────┐
+                    │   MySQL 8 (Remote)    │
+                    │  153.92.15.63        │
+                    │  u564264509_biz_     │
+                    │  connect             │
+                    └──────────────────────┘
+```
+
+**Route security tiers:**
+
+| Tier | Middleware | Applies to |
+|------|-----------|-----------|
+| Public | none | Auth endpoints, public business card, AI guide, location lookup |
+| Token required | `auth:sanctum` | `/auth/me`, logout, resend verification |
+| Token + verified email | `auth:sanctum` + `verified` | All CRUD: contacts, tags, reminders, notifications, business card, company |
+
+---
+
+## Modules & Features
+
+### 1. Authentication & User Management
+
+Full auth flow built from scratch with Laravel Sanctum:
+
+- **Registration** — creates user, issues Sanctum token, triggers queued email verification
+- **Login** — validates credentials, returns Bearer token
+- **Email Verification** — signed URL flow; backend redirects to frontend `/verify-success?email=...` on success
+- **Password Reset** — 3-step: request (sends 6-digit code via email) → verify code → reset (revokes all tokens)
+- **Magic Link Exchange** — one-time cache-based code (`POST /api/auth/magic/exchange`) for passwordless login
+- **Profile Update** — `PATCH /api/auth/me` updates name, phone, avatar, locale, timezone
+
+Key files: `AuthController.php`, `PasswordResetCode.php` (Notification), `ForceJsonResponse` middleware
+
+---
+
+### 2. Contact Management (CRM Core)
+
+The most feature-rich module — full CRM contact lifecycle:
+
+**CRUD:**
+- Create contact with auto-address upsert (city/state/country lookup)
+- Update with circular duplicate detection (`duplicate_of_id`)
+- Soft delete (SoftDeletes trait)
+- Show with eager-loaded tags, address hierarchy, reminders
+
+**Search & Filtering** (`GET /api/contacts` query params):
+
+| Parameter | Behavior |
+|-----------|----------|
+| `q` | Full-text search across name, company, email, phone; also parses inline `#hashtags` as tag filters |
+| `tag_ids` | Filter by tag IDs (comma-separated) |
+| `tags` | Filter by tag names |
+| `tag_mode` | `any` (OR) or `all` (AND) for multi-tag filter |
+| `without_tag` | Exclude contacts bearing a specific tag |
+| `with_reminder` / `without_reminder` | Filter by reminder presence |
+| `status`, `after`, `before` | Filter by linked reminder state/date |
+| `exclude_ids` | Exclude specific contact IDs (used by tag/reminder pickers) |
+| `sort` | `name`, `-name`, `id`, `-id` |
+| `per_page` | Up to 100 per page |
+
+**Image Management** (PHP GD):
+- Avatar upload → resize to max 400px wide, JPEG 75% quality
+- Business card photo (front/back) → resize to max 1200px, JPEG 80%
+- Remote URL copy → fetch from URL + resize + store locally
+- All images served through `/api/img/{path}` proxy (CORS-safe, supports private storage)
+
+**Import / Export** (Maatwebsite/Laravel-Excel):
+- Export to XLSX or CSV with all active filters applied; includes tags as `#tag1, #tag2`
+- Import from XLSX/CSV; match existing contacts by `id`, `email`, or `phone`; auto-creates tags and addresses; returns `{ created, updated, skipped, errors[] }`
+- Blank import template download with example rows and column headers
+
+**Bulk Operations:**
+- `POST /api/contacts/bulk-delete` — delete multiple contacts in one request
+
+Key files: `ContactController.php`, `ContactImageController.php`, `ContactsExport.php`, `ContactsImport.php`, `ContactsTemplateExport.php`, `Contact.php`
+
+---
+
+### 3. Tag System
+
+User-owned labels with many-to-many contact relationships:
+
+- Full CRUD (create, rename, delete tags)
+- Attach tags to a contact by ID or by name (auto-creates new tag if name doesn't exist)
+- Detach individual tags from a contact
+- Bulk attach/detach contacts to a tag (from the tag side)
+- Hashtag parsing in contact search: `q=John #vip` is parsed to apply `vip` tag filter
+
+Key file: `TagController.php`, `Tag.php`, `contact_tag` pivot
+
+---
+
+### 4. Reminder System
+
+Multi-contact reminders with pivot-table tracking:
+
+- Create reminder linked to multiple contacts via `contact_reminder` pivot; first contact is auto-set as `is_primary`
+- Filter reminders by: `contact_id`, `status` (pending/done/skipped/cancelled), `before`/`after` date, `overdue` flag
+- Mark done, bulk status update, bulk delete (with pivot cleanup)
+- Detach a contact from a reminder (auto-promotes next contact to primary)
+- `GET /api/reminders/pivot` — custom paginated JOIN query returning contact-reminder edge table for the frontend's pivot view
+- Reminder creation/update triggers `UserNotification` log automatically
+
+Channels: `app`, `email`, `calendar` (stored, not yet fully dispatched)
+
+Key file: `ReminderController.php`, `Reminder.php`, `contact_reminder` pivot table
+
+---
+
+### 5. In-App Notifications
+
+Activity feed with automatic pruning:
+
+- `UserNotification::log()` static method creates a notification and auto-prunes to max 50 per user
+- Scoped list endpoint: `scope=all|unread|upcoming|past`
+- Mark read, mark done, bulk mark read, delete
+- Scheduled command (`GenerateUpcomingNotifications`) generates upcoming-reminder notifications via `php artisan schedule:run`
+- Indexes: composite `(owner_user_id, status)` and `(owner_user_id, scheduled_at)` for query performance
+
+Key file: `NotificationController.php`, `UserNotification.php`
+
+---
+
+### 6. Digital Business Card
+
+Public shareable professional card:
+
+- One card per user; slug auto-generated from full name + unique numeric suffix
+- Supports: avatar, card front image, card back image, background image (all GD-resized on upload)
+- Social links: LinkedIn, Facebook, Twitter; contact info: email, phone, mobile, website
+- `is_public` toggle; `view_count` incremented on each public view
+- `GET /api/business-card/public/{slug}` — no auth required; view_count++
+- `POST /api/business-card/connect/{slug}` — scan another user's card; creates a Contact from their card data
+- `POST /api/business-card/extract` — receives raw OCR text (from client-side Tesseract.js); regex-parses name, job title, email, phone (up to 2 numbers), website, LinkedIn URL
+
+Key file: `BusinessCardController.php`, `BusinessCard.php`
+
+---
+
+### 7. AI Guide (Gemini 2.0 Flash + Knowledge Base)
+
+Bilingual AI assistant (Vietnamese / English):
+
+**Knowledge-base-first strategy:**
+1. `POST /api/guides/ask` or `/ask-stream` receives question + `locale` + `platform`
+2. Keyword extraction (Vietnamese + English stop words stripped)
+3. `app_knowledge` table searched by: `searchable_text` (LIKE), `title`, JSON `sample_questions`, JSON `keywords`
+4. If match found → format answer from KB; if not → call Gemini API as fallback
+
+**Gemini integration** (`GeminiService.php`):
+- Model: `gemini-2.0-flash-exp` via Google Generative Language REST API v1beta
+- Standard call: `POST /v1beta/models/gemini-2.0-flash-exp:generateContent`
+- Streaming: `POST .../streamGenerateContent?alt=sse` — reads 8192-byte chunks, fires callback per SSE data line
+- System prompt is bilingual; platform-aware (web vs mobile differences)
+- Knowledge context is fetched from DB and injected into Gemini prompt
+- Knowledge cache: `Cache::remember("gemini_knowledge_{locale}_{platform}", 3600s)`
+
+**SSE Streaming endpoint** (`GET /api/guides/ask-stream`):
+- Laravel `response()->stream()` with `Content-Type: text/event-stream`, `X-Accel-Buffering: no`
+- Sends typed events: `start`, `title`, `description`, `step`, `tips`, `related`, `done` (KB path) or `start`, `chunk`, `done` (Gemini path)
+
+**Gemini Vision** (`extractBusinessCardInfo`):
+- Sends base64 image to Gemini 2.0 Flash with OCR extraction prompt
+- Returns structured JSON: `full_name`, `job_title`, `email`, `phone`, `website`, `linkedin`, etc.
+
+**Knowledge Base management:**
+- `app_knowledge` table: `category`, `key` (unique), `platform`, `locale`, `title`, `content` (JSON), `searchable_text`, `keywords` (JSON), `sample_questions` (JSON), `related_keys` (JSON), `priority`, `view_count`
+
+Key file: `GeminiService.php`, `AiGuideController.php`, `AppKnowledge.php`
+
+---
+
+### 8. Company Profile
+
+- One company per user; linked via `users.company_id`
+- Logo upload with address (city/state/country hierarchy)
+- `POST /api/company` upserts company + address in a transaction, then updates `users.company_id`
+- Soft deletes
+
+---
+
+### 9. Location Data (Countries / States / Cities)
+
+- 3-level hierarchy: `countries` → `states` (with `country_id` FK) → `cities` (with `state_id` FK)
+- Lookup by code: `GET /api/countries/{code}/states`, `GET /api/states/{code}/cities`
+- Used as cascading dropdowns in frontend forms (contact address, company address, business card address)
+- Public endpoints (no auth required)
+
+---
+
+### 10. API Documentation (OpenAPI / Swagger)
+
+- Full `@OA\` docblock annotations on all controllers and models
+- L5-Swagger generates interactive Swagger UI at `/api/documentation`
+- `@OA\Schema` annotations on `BusinessCard` and `Company` models
+- All endpoints documented: parameters, request bodies, response schemas, security requirements
+
+---
+
+## My Role
+
+I designed and built this backend **end-to-end, solo**, across all phases:
+
+| Phase | What I did |
+|-------|-----------|
+| **Business Analysis** | Defined domain model, entities, and relationships (contacts, tags, reminders, business card, company, AI guide, notifications) based on product requirements |
+| **System Design** | Designed the 3-tier auth system (public / token-only / token+verified), multi-contact reminder pivot, notification pruning strategy, image proxy pattern |
+| **Database Design** | Designed all 21 migration files: table schemas, indexes (composite, full-text), foreign keys, soft delete strategy, pivot tables with extra columns (`is_primary`) |
+| **Backend Development** | Implemented all 10 controllers (~60+ API endpoints), 11 models, GeminiService, Excel import/export, image processing pipeline, Artisan scheduler command, all middleware |
+| **AI Integration** | Integrated Google Gemini 2.0 Flash for both conversational Q&A (standard + SSE streaming) and Gemini Vision OCR; designed knowledge-base-first query strategy |
+| **Email & Auth** | Built full auth lifecycle: registration with email verification (signed URLs), 3-step password reset (email 6-digit code), magic link exchange, profile update |
+| **DevOps** | Configured Hostinger MySQL remote database, Hostinger SMTP, CORS for multi-origin production setup, Render.com deployment, Laravel scheduler cron, Supervisor queue workers |
+| **API Documentation** | Annotated all controllers and models with full OpenAPI 3.0 `@OA\` docblocks |
+
+---
+
+## Notable Implementations
+
+### Image Proxy (`GET /api/img/{path}`)
+All stored images (avatars, card photos, company logos) are served through a single proxy route instead of direct storage URLs. This gives CORS control, allows future migration to cloud storage without breaking frontend URLs, and keeps storage private. PHP GD is used on upload to resize and recompress images before saving (not on-the-fly).
+
+### Full-Text + Hashtag Search on Contacts
+`GET /api/contacts?q=John+#vip` is parsed server-side: hashtags are extracted from the query string, resolved to tag IDs, and merged with any explicit `tag_ids` parameter. The remaining text is applied as a MySQL `FULLTEXT` search across `name`, `company`, `email`, `phone`. This lets users do natural search like `John #client #vn` in one field.
+
+### SSE Streaming for AI Guide
+The AI guide supports real-time streaming answers via Server-Sent Events. Laravel's `response()->stream()` is used with `X-Accel-Buffering: no` to prevent Nginx buffering. When answering from the knowledge base, typed events (`title`, `description`, `step`, `tips`, `related`, `done`) are emitted individually so the frontend can progressively render structured content. When falling back to Gemini, raw `chunk` events are streamed as Gemini produces them.
+
+### Knowledge-Base-First AI Strategy
+Rather than hitting Gemini for every query (slow + costly), the system first searches the `app_knowledge` table using extracted keywords matched against `searchable_text`, `title`, JSON `sample_questions`, and JSON `keywords` columns. Gemini is only called if no KB match is found. KB results are cached for 1 hour per locale+platform combination.
+
+### Multi-Contact Reminders with Pivot `is_primary`
+The `contact_reminder` pivot table has an `is_primary` boolean column. When contacts are attached to a reminder, the first one is flagged `is_primary`. When that primary contact is detached, the next contact in the pivot is automatically promoted to `is_primary`. The frontend has a dedicated pivot view (`GET /api/reminders/pivot`) that returns a paginated JOIN of reminders × contacts to show who has what reminder.
+
+### 3-Step Password Reset (Code-Based, Not Link-Based)
+Instead of the standard Laravel password-reset link (which breaks on mobile or when opening in a different browser), a 6-digit numeric code is emailed and stored in Laravel Cache with a TTL. The user submits `POST /api/auth/password/verify` with `{email, code, password}`. On success, all existing Sanctum tokens for that user are revoked before the new password is set.
+
+### Automatic Notification Pruning
+`UserNotification::log()` creates a notification then immediately calls `pruneForUser()`, which deletes all but the 50 most-recent notifications for that user. This keeps the notification table bounded without a background job or scheduled cleanup.
+
+### Circular Duplicate Detection
+Contacts have a `duplicate_of_id` field. The update logic checks for circular references before saving (contact A cannot be marked as duplicate of B if B is already marked as duplicate of A or points back to A through a chain).
+
+### Contactless Reminders
+`reminder.contact_id` is nullable — reminders can exist without a primary contact, linked only via the `contact_reminder` pivot. This was added after initial design to support general task-style reminders.
+
+---
+
+## API Documentation
+
+Interactive Swagger UI auto-generated by L5-Swagger from `@OA\` annotations:
+
+```
+GET /api/documentation
+```
+
+All 60+ endpoints are documented with request/response schemas, parameter descriptions, and authentication requirements.
+
+---
+
+## Database Schema
+
+### Tables
+
+| Table | Description | Key Columns |
+|-------|-------------|-------------|
+| `users` | User accounts | `email` (unique+index), `email_verified_at`, `company_id` FK, `business_card_id` FK, `address_id` FK |
+| `contacts` | CRM contacts | `owner_user_id`, `name`, `email`, `phone`, `ocr_raw`, `duplicate_of_id`, `avatar`, `card_image_front`, `card_image_back`; FULLTEXT on (name, company, email, phone); softDeletes |
+| `tags` | User-owned labels | `owner_user_id`, `name` |
+| `contact_tag` | Contact↔Tag pivot | `contact_id`, `tag_id`; composite index `(tag_id, contact_id)` |
+| `reminders` | Follow-up reminders | `contact_id` (nullable), `owner_user_id`, `due_at`, `status`, `channel`; indexes on `(owner_user_id, status, due_at)` |
+| `contact_reminder` | Multi-contact pivot | `contact_id`, `reminder_id`, `is_primary` (bool) |
+| `user_notifications` | Activity feed | `type`, `title`, `body`, `data` (JSON), `status`, `scheduled_at`, `read_at`; composite indexes on `(owner_user_id, status)` and `(owner_user_id, scheduled_at)` |
+| `business_cards` | Digital cards | `slug` (unique), `user_id` (unique FK), `is_public`, `view_count`, social links, image columns; softDeletes |
+| `companies` | Company profiles | `name`, `tax_code` (unique), `address_id` FK; softDeletes |
+| `addresses` | Structured addresses | `address_detail`, `city_id`, `state_id`, `country_id` (all FK) |
+| `countries` | Country reference | `code` (unique), `name` |
+| `states` | State/Province reference | `country_id` FK, `code`, `name` |
+| `cities` | City reference | `state_id` FK, `code`, `name` |
+| `app_knowledge` | AI knowledge base | `key` (unique), `category`, `platform`, `locale`, `content` (JSON), `searchable_text`, `keywords` (JSON), `sample_questions` (JSON); composite index `(category, platform, locale, is_active)` |
+| `personal_access_tokens` | Sanctum tokens | Standard Sanctum schema |
+
+### Entity Relationships
+
+```
+users
+  ├─ hasMany → contacts (owner_user_id)
+  ├─ hasMany → tags (owner_user_id)
+  ├─ hasMany → reminders (owner_user_id)
+  ├─ hasMany → user_notifications (owner_user_id)
+  ├─ hasOne  → business_cards
+  └─ belongsTo → companies
+
+contacts
+  ├─ belongsToMany → tags (via contact_tag)
+  ├─ belongsToMany → reminders (via contact_reminder, +is_primary)
+  └─ belongsTo → addresses
+
+reminders
+  ├─ belongsTo → contacts (primary, nullable)
+  └─ belongsToMany → contacts (via contact_reminder)
+
+addresses
+  ├─ belongsTo → cities
+  ├─ belongsTo → states
+  └─ belongsTo → countries
+```
+
+---
+
+## Installation & Setup
+
+### Requirements
 
 - PHP 8.2+
-- MySQL 8.0+
 - Composer
-- Node.js & NPM (for assets)
+- MySQL 8.0+
+- Node.js (for Vite assets, optional for API-only)
 
-## 🚀 Installation
+### Steps
 
-### 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/bizz-connect-api.git
-cd bizz-connect-api
-```
+git clone <repo-url>
+cd bizz_connect
 
-### 2. Install dependencies
-```bash
 composer install
-npm install
-```
 
-### 3. Environment setup
-```bash
 cp .env.example .env
 php artisan key:generate
-```
 
-Configure your `.env` file:
-```env
-APP_NAME="Bizz Connect"
-APP_ENV=production
-APP_DEBUG=false
-APP_URL=https://your-api-domain.com
-FRONTEND_URL=https://your-frontend-domain.com
+# Configure .env:
+# DB_HOST, DB_DATABASE, DB_USERNAME, DB_PASSWORD
+# MAIL_HOST, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD
+# GEMINI_API_KEY
+# APP_FRONTEND_URL (for email redirect links)
 
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=bizz_connect
-DB_USERNAME=root
-DB_PASSWORD=
-
-MAIL_MAILER=smtp
-MAIL_HOST=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USERNAME=your-email@gmail.com
-MAIL_PASSWORD=your-app-password
-MAIL_ENCRYPTION=tls
-MAIL_FROM_ADDRESS=your-email@gmail.com
-MAIL_FROM_NAME="${APP_NAME}"
-
-CACHE_STORE=database
-QUEUE_CONNECTION=database
-SESSION_DRIVER=database
-```
-
-### 4. Database setup
-```bash
 php artisan migrate --seed
 php artisan storage:link
-```
-
-### 5. Generate API documentation
-```bash
 php artisan l5-swagger:generate
+
+# Start all services concurrently:
+composer dev
+# Equivalent to:
+# php artisan serve &
+# php artisan queue:listen --tries=1 &
+# php artisan pail --timeout=0 &
 ```
 
-### 6. Set up scheduler (for upcoming notifications)
+### Key Environment Variables
 
-Add to your crontab:
-```bash
-* * * * * cd /path-to-your-project && php artisan schedule:run >> /dev/null 2>&1
-```
-
-Or run manually for testing:
-```bash
-php artisan notifications:generate-upcoming --minutes=10
-```
-
-### 7. Start the development server
-```bash
-php artisan serve
-```
-
-Visit: `http://localhost:8000/api/documentation`
-
-## 📚 API Documentation
-
-Access the interactive API documentation at:
-```
-https://your-api-domain.com/api/documentation
-```
-
-The root URL (`/`) automatically redirects to the API documentation.
-
-## 🔑 Key API Endpoints
-
-### Authentication
-```http
-POST   /api/auth/register                    # Register new user
-POST   /api/auth/login                       # Login and get bearer token
-POST   /api/auth/logout                      # Logout (revoke token)
-GET    /api/auth/me                          # Get current user info
-PATCH  /api/auth/me                          # Update current user
-GET    /api/email/verify/{id}/{hash}         # Verify email
-POST   /api/email/verification-notification  # Resend verification email
-POST   /api/auth/password/request            # Request password reset code
-POST   /api/auth/password/resend             # Resend password reset code
-POST   /api/auth/password/verify             # Verify code and reset password
-```
-
-### Contacts
-```http
-GET    /api/contacts                         # List contacts with filters
-POST   /api/contacts                         # Create contact
-GET    /api/contacts/{id}                    # Get contact details
-PUT    /api/contacts/{id}                    # Update contact
-DELETE /api/contacts/{id}                    # Delete contact
-GET    /api/contacts/export                  # Export contacts (Excel/CSV)
-GET    /api/contacts/export-template         # Download import template
-POST   /api/contacts/import                  # Import contacts
-POST   /api/contacts/bulk-delete             # Bulk delete contacts
-POST   /api/contacts/{id}/tags               # Attach tags to contact
-DELETE /api/contacts/{id}/tags/{tagId}       # Detach tag from contact
-GET    /api/contacts/{id}/reminders          # Get reminders for contact
-```
-
-### Tags
-```http
-GET    /api/tags                             # List tags
-POST   /api/tags                             # Create tag
-PUT    /api/tags/{id}                        # Update tag
-DELETE /api/tags/{id}                        # Delete tag
-```
-
-### Reminders
-```http
-GET    /api/reminders                        # List reminders with filters
-POST   /api/reminders                        # Create reminder
-GET    /api/reminders/{id}                   # Get reminder details
-PATCH  /api/reminders/{id}                   # Update reminder
-DELETE /api/reminders/{id}                   # Delete reminder
-POST   /api/reminders/{id}/done              # Mark as done
-POST   /api/reminders/{id}/contacts          # Attach contacts to reminder
-DELETE /api/reminders/{id}/contacts/{id}     # Detach contact from reminder
-POST   /api/reminders/bulk-status            # Bulk update status
-POST   /api/reminders/bulk-delete            # Bulk delete
-GET    /api/reminders/pivot                  # Get reminder-contact relationships
-```
-
-### Notifications
-```http
-GET    /api/notifications                    # List notifications
-POST   /api/notifications/{id}/read          # Mark as read
-POST   /api/notifications/{id}/done          # Mark as done
-POST   /api/notifications/bulk-read          # Bulk mark as read
-DELETE /api/notifications/{id}               # Delete notification
-```
-
-### Business Cards
-```http
-GET    /api/business-card                    # Get current user's card
-POST   /api/business-card                    # Create/update card
-DELETE /api/business-card                    # Delete card
-GET    /api/business-card/public/{slug}      # View public card (no auth)
-POST   /api/business-card/connect/{slug}     # Connect with card owner
-```
-
-### Company
-```http
-GET    /api/company                          # Get current user's company
-POST   /api/company                          # Create/update company
-DELETE /api/company                          # Delete company
-```
-
-### Locations (Public)
-```http
-GET    /api/countries                        # List all countries
-GET    /api/countries/{code}/states          # Get states by country code
-GET    /api/states/{code}/cities             # Get cities by state code
-```
-
-## 🎯 Advanced Features
-
-### Multi-Contact Reminders
-
-Reminders can be associated with multiple contacts via the `contact_reminder` pivot table:
-```json
-POST /api/reminders
-{
-  "title": "Quarterly meeting",
-  "due_at": "2025-12-01T10:00:00Z",
-  "contact_ids": [1, 2, 3],
-  "status": "pending",
-  "channel": "app",
-  "note": "Discuss Q4 goals"
-}
-```
-
-### Smart Search with Hashtags
-
-Search contacts using hashtags with AND/OR modes:
-```http
-GET /api/contacts?q=#vip #client John
-```
-
-Features:
-- Multiple hashtags automatically use AND mode
-- Combine text search with tag filtering
-- Support for `tag_mode=any` or `tag_mode=all`
-- Use `without_tag` to exclude contacts with specific tag
-
-### Contact Filters
-
-Advanced filtering options:
-```http
-GET /api/contacts?q=John&tag_ids=1,2&tag_mode=all&without_tag=5&exclude_ids=10,20&sort=-name&per_page=50
-```
-
-**Query Parameters:**
-
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| `q` | Text search (name, email, phone, company) + hashtags | `John #vip` |
-| `tag_ids` | Filter by tag IDs (comma-separated) | `1,2,3` |
-| `tags` | Filter by tag names (comma-separated) | `vip,client` |
-| `tag_mode` | `any` (OR) or `all` (AND) | `all` |
-| `without_tag` | Exclude contacts with tag ID or name | `5` or `archived` |
-| `with_reminder` | Filter contacts with reminders | `true` |
-| `without_reminder` | Filter contacts without reminders | `true` |
-| `status` | Reminder status filter | `pending` |
-| `after` | Reminders due after date | `2025-01-01` |
-| `before` | Reminders due before date | `2025-12-31` |
-| `exclude_ids` | Exclude contact IDs | `10,20,30` |
-| `sort` | Sort by field | `name`, `-name`, `id`, `-id` |
-| `per_page` | Items per page (max 100) | `50` |
-
-### Reminder Filters
-```http
-GET /api/reminders?contact_id=1&status=pending&before=2025-12-31&overdue=true&with_contacts=true
-```
-
-**Query Parameters:**
-
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| `contact_id` | Filter by contact ID | `1` |
-| `status` | Filter by status | `pending`, `done`, `skipped`, `cancelled` |
-| `before` | Due before date | `2025-12-31` |
-| `after` | Due after date | `2025-01-01` |
-| `overdue` | Show only overdue reminders | `true` |
-| `with_contacts` | Include contacts relation | `true` |
-| `per_page` | Items per page (max 100) | `20` |
-
-### Notification Filters
-```http
-GET /api/notifications?scope=unread&limit=20
-```
-
-**Query Parameters:**
-
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| `scope` | Filter scope | `all`, `unread`, `upcoming`, `past` |
-| `limit` | Number of items (max 20) | `20` |
-
-### Automatic Notifications
-
-The system automatically generates notifications for:
-
-- ✅ Contact creation
-- ✅ Reminder creation
-- ⏰ Upcoming reminders (10 minutes before due)
-- ✔️ Reminder completion
-
-Notifications are automatically pruned to keep max 50 per user.
-
-### Data Import/Export
-
-**Export contacts with filters:**
-```http
-GET /api/contacts/export?format=xlsx&ids=1,2,3&q=#vip&tag_mode=all
-```
-
-**Parameters:**
-- `format`: `xlsx` or `csv` (default: `xlsx`)
-- All contact filter parameters are supported
-
-**Import contacts from Excel/CSV:**
-```http
-POST /api/contacts/import
-Content-Type: multipart/form-data
-
-file: contacts.xlsx
-match_by: email  # Options: id, email, phone
-```
-
-**Response:**
-```json
-{
-  "status": "ok",
-  "summary": {
-    "created": 10,
-    "updated": 5,
-    "skipped": 2,
-    "errors": []
-  }
-}
-```
-
-**Download import template:**
-```http
-GET /api/contacts/export-template?format=xlsx
-```
-
-**Template columns:**
-- Name * (required)
-- Company
-- Job Title
-- Email
-- Phone
-- Address Detail
-- City (code)
-- State (code)
-- Country (code)
-- Notes
-- LinkedIn URL
-- Website URL
-- Tags (comma-separated)
-- Source
-
-## ⚙️ Configuration
-
-### CORS Configuration
-
-Update `config/cors.php` to allow your frontend domain:
-```php
-'allowed_origins' => [
-    'https://your-frontend-domain.com',
-],
-'allowed_origins_patterns' => [
-    '/^http:\/\/localhost:\d+$/',
-    '/^http:\/\/127\.0\.0\.1:\d+$/',
-],
-```
-
-### Timezone Configuration
-
-Edit `config/app.php`:
-```php
-'timezone' => 'Asia/Ho_Chi_Minh',
-```
-
-### Email Configuration
-
-For production, configure SMTP in `.env`:
 ```env
+APP_URL=http://127.0.0.1:8000
+APP_FRONTEND_URL=http://localhost:5173
+
+DB_CONNECTION=mysql
+DB_HOST=153.92.15.63
+DB_DATABASE=u564264509_biz_connect
+
 MAIL_MAILER=smtp
-MAIL_HOST=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USERNAME=your-email@gmail.com
-MAIL_PASSWORD=your-app-password
-MAIL_ENCRYPTION=tls
+MAIL_HOST=smtp.hostinger.com
+MAIL_PORT=465
+MAIL_ENCRYPTION=ssl
+MAIL_USERNAME=no-reply@biz-connect.online
+
+QUEUE_CONNECTION=database
+CACHE_STORE=database
+
+GEMINI_API_KEY=your_gemini_api_key
 ```
 
-**Gmail Setup:**
-1. Enable 2-factor authentication
-2. Generate App Password: https://myaccount.google.com/apppasswords
-3. Use the generated password in `MAIL_PASSWORD`
+---
 
-### Scheduler Configuration
+## Deployment
 
-The scheduler runs every minute and executes:
-```php
-// Generates upcoming notifications (10 minutes before due)
-$schedule->command('notifications:generate-upcoming --minutes=10')
-    ->everyMinute()
-    ->onOneServer()
-    ->withoutOverlapping();
-```
+**Production stack:**
+- Web server: Nginx + PHP-FPM (or Apache)
+- PHP 8.2+, Composer
+- MySQL 8 (remote at `153.92.15.63`)
+- Queue: `php artisan queue:work` managed by Supervisor
+- Scheduler: cron `* * * * * php artisan schedule:run`
+- SSL: Certbot / Let's Encrypt
 
-## 🚢 Deployment
-
-### Using Docker
-
-A Dockerfile is included for containerized deployment:
+**Production build:**
 ```bash
-docker build -t bizz-connect-api .
-docker run -p 8000:80 bizz-connect-api
-```
-
-### Manual Deployment (Production)
-
-1. **Clone and install dependencies:**
-```bash
-git clone https://github.com/yourusername/bizz-connect-api.git
-cd bizz-connect-api
 composer install --optimize-autoloader --no-dev
-npm install && npm run build
-```
-
-2. **Configure environment:**
-```bash
-cp .env.example .env
-php artisan key:generate
-# Edit .env with production settings
-```
-
-3. **Set up database:**
-```bash
-php artisan migrate --force
-php artisan storage:link
-```
-
-4. **Set proper permissions:**
-```bash
-chmod -R 775 storage bootstrap/cache
-chown -R www-data:www-data storage bootstrap/cache
-```
-
-5. **Optimize for production:**
-```bash
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 php artisan l5-swagger:generate
+php artisan migrate --force
+php artisan storage:link
 ```
 
-6. **Configure web server (Nginx example):**
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-    root /path/to/bizz-connect-api/public;
-
-    add_header X-Frame-Options "SAMEORIGIN";
-    add_header X-Content-Type-Options "nosniff";
-
-    index index.php;
-
-    charset utf-8;
-
-    location / {
-        try_files $uri $uri/ /index.php?$query_string;
-    }
-
-    location = /favicon.ico { access_log off; log_not_found off; }
-    location = /robots.txt  { access_log off; log_not_found off; }
-
-    error_page 404 /index.php;
-
-    location ~ \.php$ {
-        fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
-        include fastcgi_params;
-    }
-
-    location ~ /\.(?!well-known).* {
-        deny all;
-    }
-}
-```
-
-7. **Set up SSL (using Certbot):**
-```bash
-sudo certbot --nginx -d your-domain.com
-```
-
-8. **Set up supervisor for queue worker:**
-```bash
-sudo nano /etc/supervisor/conf.d/bizz-connect-worker.conf
-```
-```ini
-[program:bizz-connect-worker]
-process_name=%(program_name)s_%(process_num)02d
-command=php /path/to/bizz-connect-api/artisan queue:work --sleep=3 --tries=3 --max-time=3600
-autostart=true
-autorestart=true
-stopasgroup=true
-killasgroup=true
-user=www-data
-numprocs=2
-redirect_stderr=true
-stdout_logfile=/path/to/bizz-connect-api/storage/logs/worker.log
-stopwaitsecs=3600
-```
-```bash
-sudo supervisorctl reread
-sudo supervisorctl update
-sudo supervisorctl start bizz-connect-worker:*
-```
-
-9. **Set up cron for scheduler:**
-```bash
-crontab -e
-```
-
-Add:
-```
-* * * * * cd /path/to/bizz-connect-api && php artisan schedule:run >> /dev/null 2>&1
-```
-
-### Deploy to Render.com
-
-1. Create a new Web Service
-2. Connect your GitHub repository
-3. Set build command: `composer install --optimize-autoloader --no-dev`
-4. Set start command: `php artisan serve --host=0.0.0.0 --port=$PORT`
-5. Add environment variables from `.env`
-6. Deploy!
-
-## 🗄️ Database Schema
-
-### Key Tables
-
-| Table | Description |
-|-------|-------------|
-| `users` | User accounts with email verification |
-| `contacts` | Contact information with address support |
-| `tags` | User-specific tags |
-| `contact_tag` | Many-to-many pivot for contacts and tags |
-| `reminders` | Reminder records with soft deletes |
-| `contact_reminder` | Many-to-many pivot for multi-contact reminders |
-| `user_notifications` | Activity feed and upcoming alerts |
-| `business_cards` | Digital business cards with public sharing |
-| `companies` | Company profiles |
-| `addresses` | Address records |
-| `countries` | Country reference data |
-| `states` | State/province reference data |
-| `cities` | City reference data |
-
-### Entity Relationships
-```
-users
-  ├─ hasMany contacts
-  ├─ hasMany tags
-  ├─ hasMany reminders
-  ├─ hasMany user_notifications
-  ├─ hasOne business_card
-  └─ belongsTo company
-
-contacts
-  ├─ belongsToMany tags (via contact_tag)
-  ├─ belongsToMany reminders (via contact_reminder)
-  └─ belongsTo address
-
-reminders
-  ├─ belongsTo contact (primary)
-  └─ belongsToMany contacts (via contact_reminder)
-
-addresses
-  ├─ belongsTo city
-  ├─ belongsTo state
-  └─ belongsTo country
-```
-
-## 🔒 Security
-
-### Authentication Flow
-
-1. **Register**: Email verification required
-2. **Login**: Returns bearer token
-3. **API Requests**: Include token in header: `Authorization: Bearer {token}`
-4. **Logout**: Revokes current token
-
-### Security Features
-
-- ✅ Email verification required
-- ✅ Bearer token authentication (Sanctum)
-- ✅ Password reset with 6-digit verification code (10 min expiry)
-- ✅ Rate limiting on sensitive endpoints
-- ✅ CSRF protection for web routes
-- ✅ Input validation and sanitization
-- ✅ SQL injection prevention via Eloquent ORM
-- ✅ Signed URLs for email verification
-- ✅ One-time use magic codes
-- ✅ Password hashing with bcrypt
-- ✅ HTTPS enforced in production
-
-### Best Practices
-
-1. **Never expose `.env` file**
-2. **Use strong `APP_KEY`** (generated automatically)
-3. **Enable HTTPS** in production
-4. **Set `APP_DEBUG=false`** in production
-5. **Configure CORS** properly
-6. **Rotate tokens** regularly
-7. **Monitor logs** for suspicious activity
-
-## 🧪 Testing
-
-### Test Email Configuration
-```bash
-curl https://your-api-domain.com/_test-mail
-```
-
-### Manual API Testing
-```bash
-# Register
-curl -X POST https://your-api-domain.com/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"name":"John Doe","email":"john@example.com","password":"password123"}'
-
-# Login
-curl -X POST https://your-api-domain.com/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"john@example.com","password":"password123"}'
-
-# Get Profile (replace {token} with your bearer token)
-curl -X GET https://your-api-domain.com/api/auth/me \
-  -H "Authorization: Bearer {token}"
-
-# Create Contact
-curl -X POST https://your-api-domain.com/api/contacts \
-  -H "Authorization: Bearer {token}" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Jane Smith","email":"jane@example.com","phone":"+1234567890"}'
-```
-
-## 📊 API Response Format
-
-### Success Response
-```json
-{
-  "data": {
-    "id": 1,
-    "name": "John Doe",
-    "email": "john@example.com",
-    "created_at": "2025-01-15T10:30:00Z",
-    "updated_at": "2025-01-15T10:30:00Z"
-  }
-}
-```
-
-### Paginated Response
-```json
-{
-  "data": [
-    {
-      "id": 1,
-      "name": "John Doe",
-      "email": "john@example.com"
-    }
-  ],
-  "current_page": 1,
-  "per_page": 20,
-  "total": 100,
-  "last_page": 5,
-  "from": 1,
-  "to": 20
-}
-```
-
-### Error Response
-```json
-{
-  "message": "Validation error",
-  "errors": {
-    "email": ["The email field is required."],
-    "name": ["The name must not be greater than 255 characters."]
-  }
-}
-```
-
-### HTTP Status Codes
-
-| Code | Description |
-|------|-------------|
-| 200 | Success |
-| 201 | Created |
-| 204 | No Content (successful deletion) |
-| 400 | Bad Request |
-| 401 | Unauthorized |
-| 403 | Forbidden |
-| 404 | Not Found |
-| 422 | Validation Error |
-| 500 | Internal Server Error |
-
-## 🏗️ Project Structure
-```
-bizz-connect-api/
-├── app/
-│   ├── Console/
-│   │   └── Commands/
-│   │       └── GenerateUpcomingNotifications.php
-│   ├── Exports/
-│   │   ├── ContactsExport.php
-│   │   └── ContactsTemplateExport.php
-│   ├── Http/
-│   │   ├── Controllers/
-│   │   │   ├── AuthController.php
-│   │   │   ├── ContactController.php
-│   │   │   ├── ReminderController.php
-│   │   │   ├── TagController.php
-│   │   │   ├── NotificationController.php
-│   │   │   ├── BusinessCardController.php
-│   │   │   ├── CompanyController.php
-│   │   │   └── LocationController.php
-│   │   └── Middleware/
-│   ├── Imports/
-│   │   └── ContactsImport.php
-│   ├── Models/
-│   │   ├── User.php
-│   │   ├── Contact.php
-│   │   ├── Tag.php
-│   │   ├── Reminder.php
-│   │   ├── UserNotification.php
-│   │   ├── BusinessCard.php
-│   │   ├── Company.php
-│   │   ├── Address.php
-│   │   ├── Country.php
-│   │   ├── State.php
-│   │   └── City.php
-│   └── Notifications/
-│       └── PasswordResetCode.php
-├── config/
-├── database/
-│   ├── migrations/
-│   └── seeders/
-├── routes/
-│   ├── api.php
-│   └── web.php
-├── storage/
-├── .env.example
-├── composer.json
-├── Dockerfile
-└── README.md
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📝 License
-
-This project is proprietary software. All rights reserved.
-
-## 👥 Authors
-
-- Development Team - Initial work
-
-## 🙏 Acknowledgments
-
-- Laravel community for the excellent framework
-- Contributors to the Laravel ecosystem packages used in this project
-- All developers who have contributed to open-source packages
-
-## 📞 Support
-
-For issues and feature requests, please use the [GitHub issue tracker](https://github.com/yourusername/bizz-connect-api/issues).
-
----
-
-**Made with ❤️ using Laravel**
-# Test deploy
+**CORS origins configured for:**
+- `bizz-connect-web.onrender.com`
+- `biz-connect.online` and `*.biz-connect.online`
+- All `localhost:*` and `127.0.0.1:*` ports (dev)
